@@ -801,21 +801,18 @@ audio {
 		aspect-ratio: 3 / 4;
 	}
 
-	.archive.grid .item.post-type-text {
-		grid-column: span 2;
-	}
-
 	.archive.grid .text-post-body {
 		padding: 8px 6px;
 		font-size: 11px;
-		line-height: 1.25;
+		line-height: 1;
+		min-height: 100px;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: normal;
 		display: -webkit-box;
 		-webkit-box-orient: vertical;
-		-webkit-line-clamp: 2;
-		line-clamp: 2;
+		-webkit-line-clamp: 4;
+		line-clamp: 4;
 		max-width: 100%;
 	}
 

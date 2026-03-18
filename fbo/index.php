@@ -1672,7 +1672,7 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 				<?php $postLocationDisplay = ($view === 'single' && $postLocationCoords !== '') ? $postLocationCoords : $postLocationLabel; ?>
 				<?php $postLocationIsCoordsOnly = ($view === 'grid' && $postLocationCoords !== '' && $postLocationDisplay === $postLocationCoords); ?>
 				<?php $postLocationShort = $postLocationDisplay !== '' ? (preg_split('/\s+/', $postLocationDisplay, 2)[0] ?? $postLocationDisplay) : ''; ?>
-				<article class="item post-type-<?= htmlspecialchars($postType, ENT_QUOTES, 'UTF-8') ?><?= $isPinned ? ' is-pinned' : '' ?>"
+				<article class="item<?= $isPinned ? ' is-pinned' : '' ?>"
 					data-post-id="<?= htmlspecialchars((string) $post['id'], ENT_QUOTES, 'UTF-8') ?>"
 					data-post-type="<?= htmlspecialchars($postType, ENT_QUOTES, 'UTF-8') ?>"
 					data-media-path="<?= htmlspecialchars($postMediaPath, ENT_QUOTES, 'UTF-8') ?>">
