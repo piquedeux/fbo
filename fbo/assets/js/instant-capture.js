@@ -110,6 +110,7 @@
 
         // Audio recording
         let mediaRecorder = null;
+        let audioRecorderMime = '';
         let audioChunks = [];
         let audioStream = null;
         let audioContext = null;
@@ -199,7 +200,7 @@
             }
 
             if (mediaRecorder && mediaRecorder.state === 'recording') {
-                // stop
+                recordBtn.disabled = true;
                 mediaRecorder.stop();
                 return;
             }
@@ -238,32 +239,23 @@
                 return;
             }
 
+            audioRecorderMime = recorderMime;
             mediaRecorder = new MediaRecorder(audioStream, { mimeType: recorderMime });
             audioChunks = [];
             startVisualizer(audioStream);
             recordBtn.classList.add('ui-btn-record-live', 'active');
-
-            const stopBtn = document.createElement('button');
-            stopBtn.type = 'button';
-            stopBtn.className = 'ui-btn ui-btn-record-stop';
-            stopBtn.textContent = 'Stop recording';
-            stopBtn.id = 'stopRecordBtn';
-            heroActions.appendChild(stopBtn);
-
-            stopBtn.addEventListener('click', () => {
-                if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
-            });
+            recordBtn.textContent = 'Stop audio';
 
             mediaRecorder.addEventListener('dataavailable', (e) => {
                 if (e.data && e.data.size) audioChunks.push(e.data);
             });
 
             mediaRecorder.addEventListener('stop', () => {
-                const blobType = recorderMime.includes('mp4') ? 'audio/mp4' : recorderMime;
+                const blobType = audioRecorderMime.includes('mp4') ? 'audio/mp4' : audioRecorderMime;
                 const blob = new Blob(audioChunks, { type: blobType });
                 const filename = 'recording_' + Date.now() + (
-                    recorderMime.includes('ogg') ? '.ogg'
-                        : recorderMime.includes('webm') ? '.webm'
+                    audioRecorderMime.includes('ogg') ? '.ogg'
+                        : audioRecorderMime.includes('webm') ? '.webm'
                             : '.m4a'
                 );
                 const file = new File([blob], filename, { type: blobType });
@@ -276,8 +268,10 @@
                     audioStream = null;
                 }
                 mediaRecorder = null;
+                audioRecorderMime = '';
                 recordBtn.classList.remove('ui-btn-record-live', 'active');
-                stopBtn.remove();
+                recordBtn.textContent = 'Record audio';
+                recordBtn.disabled = false;
             });
 
             mediaRecorder.start();
@@ -367,12 +361,6 @@
             primaryBtn.className = 'ui-btn';
             primaryBtn.textContent = mode === 'video' ? 'Start video' : 'Take photo';
 
-            const stopBtn = document.createElement('button');
-            stopBtn.type = 'button';
-            stopBtn.className = 'ui-btn';
-            stopBtn.textContent = 'Stop';
-            stopBtn.hidden = true;
-
             const keepBtn = document.createElement('button');
             keepBtn.type = 'button';
             keepBtn.className = 'ui-btn ui-btn-strong';
@@ -397,7 +385,6 @@
             flipBtn.hidden = true;
 
             controls.appendChild(primaryBtn);
-            controls.appendChild(stopBtn);
             controls.appendChild(keepBtn);
             controls.appendChild(retakeBtn);
             controls.appendChild(flipBtn);
@@ -529,9 +516,10 @@
                 videoPreview.hidden = true;
                 locationWrap.hidden = true;
                 primaryBtn.hidden = false;
-                stopBtn.hidden = true;
                 keepBtn.hidden = true;
                 retakeBtn.hidden = true;
+                primaryBtn.disabled = false;
+                primaryBtn.textContent = mode === 'video' ? 'Start video' : 'Take photo';
                 selectedPlace = null;
                 locationInput.value = '';
                 clearSuggestions();
@@ -650,7 +638,6 @@
 
                     locationWrap.hidden = false;
                     primaryBtn.hidden = true;
-                    stopBtn.hidden = true;
                     keepBtn.hidden = false;
                     retakeBtn.hidden = false;
                     recorder = null;
@@ -660,8 +647,7 @@
                 elapsedSec = 0;
                 recordingInfo.textContent = 'Recording 0s / 10s';
                 recordingInfo.hidden = false;
-                primaryBtn.hidden = true;
-                stopBtn.hidden = false;
+                primaryBtn.textContent = 'Stop video';
 
                 elapsedTimer = window.setInterval(() => {
                     elapsedSec += 1;
@@ -677,16 +663,15 @@
 
             primaryBtn.addEventListener('click', () => {
                 if (mode === 'video') {
+                    if (recorder && recorder.state === 'recording') {
+                        primaryBtn.disabled = true;
+                        recorder.stop();
+                        return;
+                    }
                     startVideoRecording();
                     return;
                 }
                 capturePhoto();
-            });
-
-            stopBtn.addEventListener('click', () => {
-                if (recorder && recorder.state === 'recording') {
-                    recorder.stop();
-                }
             });
 
             flipBtn.addEventListener('click', async () => {

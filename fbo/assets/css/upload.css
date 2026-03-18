@@ -202,10 +202,12 @@
     padding: 10px;
     display: grid;
     gap: 10px;
+    box-sizing: border-box;
 }
 
 .instant-capture-frame {
-    width: min(92vw, 540px);
+    width: 100%;
+    max-width: 540px;
     max-width: 100%;
     aspect-ratio: 1 / 1;
     background: #000;
@@ -245,14 +247,24 @@
 }
 
 .instant-capture-controls {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: 8px;
+}
+
+.instant-capture-controls .ui-btn {
+    width: 100%;
+    min-width: 0;
 }
 
 .instant-capture-location {
     display: grid;
     gap: 6px;
+}
+
+.instant-capture-location-input {
+    width: 100%;
+    min-width: 0;
 }
 
 .instant-capture-location-label {
@@ -281,6 +293,8 @@
     padding: 6px 8px;
     font-size: 12px;
     cursor: pointer;
+    white-space: normal;
+    word-break: break-word;
 }
 
 .instant-capture-suggestion:hover {
@@ -308,5 +322,36 @@
         width: 100%;
         max-height: calc(100vh - 12px);
         padding: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+
+    .instant-capture-overlay {
+        align-items: flex-start;
+        padding: max(6px, env(safe-area-inset-top)) 6px 6px;
+    }
+
+    .instant-capture-modal {
+        max-height: calc(100dvh - 12px);
+        gap: 8px;
+        padding: 6px;
+    }
+
+    .instant-capture-frame {
+        max-width: 100%;
+    }
+
+    .instant-capture-controls {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px;
+    }
+
+    .instant-capture-controls .ui-btn:last-child {
+        grid-column: 1 / -1;
+    }
+
+    .instant-capture-suggestions {
+        max-height: 140px;
     }
 }
