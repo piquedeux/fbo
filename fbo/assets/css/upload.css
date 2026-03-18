@@ -1,0 +1,312 @@
+/* Upload panel and preview styles for media uploads */
+.subtitle-form {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.subtitle-form input,
+.upload-auth-input {
+    flex: 1;
+    min-width: 220px;
+    border: 2px solid var(--line);
+    background: var(--bg);
+    color: var(--fg);
+    padding: 8px 10px;
+    outline: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.upload-panel textarea {
+    width: 100%;
+    min-height: 88px;
+    border: 2px solid var(--line);
+    background: var(--bg);
+    color: var(--fg);
+    padding: 8px 10px;
+    outline: none;
+    border-radius: 0;
+    box-shadow: none;
+    resize: vertical;
+    font: inherit;
+}
+
+.upload-panel {
+    display: grid;
+    gap: 8px;
+    border: 2px solid var(--line);
+    padding: 10px;
+    margin-top: 4px;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.upload-input-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+.upload-dropzone {
+    border: 2px dashed var(--line);
+    background: color-mix(in srgb, var(--bg) 90%, var(--fg) 10%);
+    color: var(--fg);
+    padding: 14px 12px;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.upload-dropzone:hover,
+.upload-dropzone:focus-visible,
+.upload-dropzone.is-dragover {
+    background: color-mix(in srgb, var(--bg) 82%, var(--fg) 18%);
+    border-color: var(--fg);
+    outline: none;
+}
+
+.upload-dropzone-sub {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.upload-checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.upload-checkbox-row input[type='checkbox'] {
+    width: 14px;
+    height: 14px;
+    accent-color: #111111;
+}
+
+.upload-preview {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.upload-preview audio {
+    width: 100%;
+    height: auto;
+    align-self: center;
+}
+
+.upload-empty {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.upload-note {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.recording-visualizer {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    border: 2px solid var(--line);
+    padding: 8px;
+    overflow: hidden;
+    display: grid;
+    gap: 6px;
+}
+
+.recording-visualizer-label {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.recording-visualizer-canvas {
+    width: 100%;
+    max-width: 100%;
+    height: 64px;
+    display: block;
+}
+
+.ui-btn-record-live {
+    border-color: #b91c1c;
+    background: #b91c1c;
+    color: #ffffff;
+}
+
+.ui-btn-record-stop {
+    border-color: #b91c1c;
+    color: #b91c1c;
+}
+
+.ui-btn-record-stop:hover,
+.ui-btn-record-stop.active {
+    background: #b91c1c;
+    color: #ffffff;
+}
+
+.delete-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 3;
+    padding: 3px 6px;
+    font-size: 11px;
+    line-height: 1.1;
+}
+
+.pin-btn {
+    left: 6px;
+    right: auto;
+}
+
+.pinned-badge.with-delete {
+    right: 64px;
+}
+
+.item.marked-delete {
+    opacity: 0.45;
+    outline: 2px solid #b91c1c;
+}
+
+.instant-capture-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+}
+
+.instant-capture-modal {
+    width: min(96vw, 760px);
+    max-height: calc(100vh - 24px);
+    overflow: auto;
+    background: var(--bg);
+    color: var(--fg);
+    border: 2px solid var(--line);
+    padding: 10px;
+    display: grid;
+    gap: 10px;
+}
+
+.instant-capture-frame {
+    width: min(92vw, 540px);
+    max-width: 100%;
+    aspect-ratio: 1 / 1;
+    background: #000;
+    position: relative;
+    overflow: hidden;
+    margin: 0 auto;
+}
+
+.instant-capture-video,
+.instant-capture-image,
+.instant-capture-video-preview {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: #000000;
+    display: block;
+}
+
+.instant-capture-video-preview {
+    object-fit: contain;
+}
+
+.instant-capture-video[hidden],
+.instant-capture-image[hidden],
+.instant-capture-video-preview[hidden],
+.instant-capture-location[hidden],
+.instant-capture-recording-note[hidden] {
+    display: none !important;
+}
+
+.instant-capture-recording-note {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+}
+
+.instant-capture-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.instant-capture-location {
+    display: grid;
+    gap: 6px;
+}
+
+.instant-capture-location-label {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.instant-capture-suggestions {
+    display: grid;
+    gap: 4px;
+    border: 2px solid var(--line);
+    padding: 6px;
+    max-height: 180px;
+    overflow: auto;
+}
+
+.instant-capture-suggestions[hidden] {
+    display: none;
+}
+
+.instant-capture-suggestion {
+    border: 1px solid var(--line);
+    background: var(--bg);
+    color: var(--fg);
+    text-align: left;
+    padding: 6px 8px;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.instant-capture-suggestion:hover {
+    background: var(--fg);
+    color: var(--bg);
+}
+
+@media (max-width: 700px) {
+
+    .subtitle-form input,
+    .upload-auth-input {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .upload-preview {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .hero-actions {
+        width: 100%;
+    }
+
+    .instant-capture-modal {
+        width: 100%;
+        max-height: calc(100vh - 12px);
+        padding: 8px;
+    }
+}

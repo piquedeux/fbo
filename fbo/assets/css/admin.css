@@ -1,0 +1,172 @@
+.subtitle-form {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.upload-auth-input {
+	flex: 1;
+	min-width: 220px;
+	border: 2px solid var(--line);
+	background: var(--bg);
+	color: var(--fg);
+	padding: 8px 10px;
+	outline: none;
+	border-radius: 0;
+	box-shadow: none;
+}
+
+.upload-panel textarea {
+	width: 100%;
+	min-height: 88px;
+	border: 2px solid var(--line);
+	background: var(--bg);
+	color: var(--fg);
+	padding: 8px 10px;
+	outline: none;
+	border-radius: 0;
+	box-shadow: none;
+	resize: vertical;
+	font: inherit;
+}
+
+.upload-panel {
+	display: grid;
+	gap: 8px;
+	border: 2px solid var(--line);
+	padding: 10px;
+	margin-top: 4px;
+}
+
+.upload-preview {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 8px;
+}
+
+.upload-empty {
+	font-size: 12px;
+	color: var(--muted);
+}
+
+.upload-note {
+	font-size: 12px;
+	color: var(--muted);
+}
+
+.upload-note-right {
+	margin-left: auto;
+	text-align: right;
+}
+
+.danger-btn {
+	border-color: #b91c1c;
+	background: #b91c1c;
+	color: #ffffff;
+}
+
+.danger-btn:hover,
+.danger-btn.active {
+	border-color: #991b1b;
+	background: #991b1b;
+	color: #ffffff;
+}
+
+.danger-note {
+	color: #b91c1c;
+}
+
+.notice-warn {
+	color: #b45309;
+}
+
+.delete-btn {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	z-index: 3;
+	padding: 3px 6px;
+	font-size: 11px;
+	line-height: 1.1;
+}
+
+.pin-btn {
+	left: 6px;
+	right: auto;
+}
+
+.item.marked-delete {
+	opacity: 0.45;
+	outline: 2px solid #b91c1c;
+}
+
+.pending-delete-actions {
+	display: none;
+}
+
+.pending-delete-actions.active {
+	display: grid;
+	gap: 8px;
+}
+
+.pinned-badge.with-delete {
+	right: 64px;
+}
+
+@media (max-width: 700px) {
+	.pin-form {
+		left: 0;
+		right: 0;
+	}
+
+	.upload-auth-input {
+		min-width: 100%;
+	}
+
+	.upload-preview {
+		grid-template-columns: 1fr;
+	}
+
+	.delete-btn,
+	.pin-btn {
+		font-size: 10px;
+		line-height: 1;
+		padding: 2px 6px;
+	}
+
+	.pin-btn {
+		top: 34px;
+		right: 6px;
+		left: auto;
+		transform: none;
+	}
+
+	.delete-btn:not(.pin-btn) {
+		top: auto;
+		bottom: 6px;
+		right: auto;
+		left: 50%;
+		transform: translateX(-50%);
+	}
+
+	.pinned-badge.with-delete {
+		right: 6px;
+	}
+
+	.hero .hero-actions {
+		width: 100%;
+	}
+
+	.hero .hero-actions .ui-btn {
+		white-space: normal;
+		word-break: break-word;
+	}
+
+	.subtitle-form {
+		flex-direction: column;
+	}
+
+	.upload-panel {
+		max-width: 100%;
+	}
+}

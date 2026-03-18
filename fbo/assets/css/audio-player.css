@@ -1,0 +1,306 @@
+/* Audio player styles: keep audio previews same size as images/videos, hide native video play overlays,
+   show a rotating cover while playing and a simple play-only control */
+
+.media-wrap.audio {
+    /* ensure audio wrapper matches other media in grid */
+    aspect-ratio: 3 / 4;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.archive.single .media-wrap.audio {
+    aspect-ratio: auto;
+    min-height: clamp(360px, 64vh, 820px);
+    align-items: stretch;
+    justify-content: stretch;
+}
+
+.audio-player {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    position: relative;
+}
+
+.archive.single .media-wrap.audio .audio-player {
+    height: 100%;
+}
+
+.audio-cover {
+    width: 100%;
+    height: auto;
+    max-height: calc(100% - 72px);
+    object-fit: cover;
+    display: block;
+    transform-origin: 50% 50%;
+    transition: transform 0.3s linear;
+}
+
+.audio-player.playing .audio-cover {
+    animation: audio-rotate 6s linear infinite;
+}
+
+@keyframes audio-rotate {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ensure grid preview covers fill the media-wrap area */
+.media-wrap.audio .audio-cover {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* placeholder when no cover image available */
+.audio-cover.no-cover {
+    background: #000;
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    opacity: 0;
+}
+
+.audio-cover-label {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #ffffff;
+    font-size: 12px;
+    line-height: 1.2;
+    letter-spacing: 0.04em;
+    text-transform: lowercase;
+    pointer-events: none;
+}
+
+.audio-player.no-cover .audio-cover-label {
+    display: flex;
+}
+
+.audio-playing-bars {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 10px;
+    z-index: 7;
+    display: none;
+    align-items: flex-end;
+    justify-content: stretch;
+    gap: 2px;
+    padding: 0 8px;
+    pointer-events: none;
+}
+
+.audio-player.is-list .audio-playing-bars {
+    bottom: 66px;
+}
+
+.audio-playing-bars span {
+    flex: 1 1 0;
+    min-width: 2px;
+    height: 9px;
+    background: #ffffff;
+    border-radius: 0;
+    opacity: 0.95;
+    transform-origin: center bottom;
+    animation: audio-bars 0.9s ease-in-out infinite;
+}
+
+.audio-player.reactive-enabled .audio-playing-bars span {
+    animation: none;
+    transition: transform 90ms linear, opacity 90ms linear;
+}
+
+.audio-playing-bars span:nth-child(2n) {
+    animation-duration: 1.1s;
+}
+
+.audio-playing-bars span:nth-child(3n) {
+    animation-duration: 0.75s;
+}
+
+.audio-playing-bars span:nth-child(1) { animation-delay: -0.42s; }
+.audio-playing-bars span:nth-child(2) { animation-delay: -0.21s; }
+.audio-playing-bars span:nth-child(3) { animation-delay: -0.67s; }
+.audio-playing-bars span:nth-child(4) { animation-delay: -0.11s; }
+.audio-playing-bars span:nth-child(5) { animation-delay: -0.53s; }
+.audio-playing-bars span:nth-child(6) { animation-delay: -0.35s; }
+.audio-playing-bars span:nth-child(7) { animation-delay: -0.74s; }
+.audio-playing-bars span:nth-child(8) { animation-delay: -0.18s; }
+.audio-playing-bars span:nth-child(9) { animation-delay: -0.6s; }
+.audio-playing-bars span:nth-child(10) { animation-delay: -0.29s; }
+
+.audio-player.playing .audio-playing-bars {
+    display: flex;
+}
+
+@keyframes audio-bars {
+    0%,
+    100% {
+        transform: scaleY(0.35);
+        opacity: 0.7;
+    }
+
+    50% {
+        transform: scaleY(2.4);
+        opacity: 1;
+    }
+}
+
+.audio-title {
+    display: none;
+}
+
+.audio-controls {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px 12px 10px;
+    background: rgba(0, 0, 0, 0.8);
+}
+
+.archive.single .audio-controls {
+    margin-top: auto;
+}
+
+.audio-controls {
+    min-height: 52px;
+}
+
+.audio-control-btn {
+    min-width: 62px;
+    border: 1px solid #ffffff;
+    background: #000000;
+    color: #ffffff;
+    font-size: 12px;
+    line-height: 1;
+    padding: 7px 10px;
+    cursor: pointer;
+}
+
+.audio-control-btn:hover {
+    background: #ffffff;
+    color: #000000;
+}
+
+.audio-progress-range {
+    width: 100%;
+    margin: 0;
+    background: transparent;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+
+.audio-progress-range::-webkit-slider-runnable-track {
+    height: 3px;
+    background: rgba(255, 255, 255, 0.45);
+}
+
+.audio-progress-range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 10px;
+    height: 10px;
+    margin-top: -3.5px;
+    border: 1px solid #ffffff;
+    border-radius: 0;
+    background: #ffffff;
+}
+
+.audio-progress-range::-moz-range-track {
+    height: 3px;
+    border: 0;
+    background: rgba(255, 255, 255, 0.45);
+}
+
+.audio-progress-range::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    border: 1px solid #ffffff;
+    border-radius: 0;
+    background: #ffffff;
+}
+
+.audio-time-current,
+.audio-time-total {
+    color: #ffffff;
+    font-size: 11px;
+    line-height: 1;
+    min-width: 34px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+
+/* grid-only indicator (centered SVG) */
+.audio-indicator {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 6;
+    width: 36px;
+    height: 36px;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+}
+
+.audio-indicator svg {
+    width: 36px;
+    height: 36px;
+}
+
+/* hide native big play button on some browsers */
+video::-webkit-media-controls-start-playback-button {
+    display: none !important;
+}
+
+video::-webkit-media-controls {
+    display: none !important;
+}
+
+/* remove inserting covers into the timestamp/stamp area - keep stamp styling unchanged */
+/* (stamp thumbnail insertion disabled in JS) */
+
+@media (max-width: 700px) {
+    .archive.single .media-wrap.audio {
+        min-height: clamp(260px, 52vh, 620px);
+    }
+
+    .audio-player.is-list .audio-playing-bars {
+        bottom: 62px;
+    }
+
+    .audio-controls {
+        grid-template-columns: auto 1fr auto auto;
+        gap: 6px;
+        padding: 8px 8px 10px 8px;
+    }
+
+    .audio-control-btn {
+        min-width: 56px;
+        padding: 6px 8px;
+        font-size: 11px;
+    }
+}

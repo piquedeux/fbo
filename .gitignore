@@ -1,0 +1,57 @@
+# ──────────────────────────────────────────────────────────────
+#  FBO Blog Template — .gitignore
+# ──────────────────────────────────────────────────────────────
+
+# ── Secrets ───────────────────────────────────────────────────
+# .env holds DB password and other credentials — NEVER commit
+.env
+!.env.example
+
+# config.php contains real DB credentials — NEVER commit
+multi-tenant/config.php
+# Safe to commit: config.example.php (template, no real values)
+!multi-tenant/config.example.php
+
+# smtp-config.php contains Gmail App Password — NEVER commit
+fbo/smtp-config.php
+
+# ── Runtime tenant data ───────────────────────────────────────
+# Provisioned blog directories are created at runtime, not code
+multi-tenant/blogs/*/
+# Keep the empty placeholder so the directory stays in git
+!multi-tenant/blogs/.gitkeep
+
+# ── Uploaded media ────────────────────────────────────────────
+# User-uploaded files in the demo/standalone fbo instance
+fbo/media/*
+!fbo/media/.gitkeep
+
+# ── Runtime JSON data (standalone fbo instance) ───────────────
+# posts.json and settings.json in the root fbo/ are demo data;
+# the actual template copies live inside each tenant blog dir.
+# Comment these out if you want to track the demo defaults.
+# fbo/backend/posts.json
+# fbo/backend/settings.json
+
+# ── Temporary diagnostic files ────────────────────────────────
+# debug.php is sometimes dropped on the server for live testing
+debug.php
+**/debug.php
+
+# ── macOS ─────────────────────────────────────────────────────
+.DS_Store
+**/.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# ── Editor / IDE ──────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── PHP logs / cache ──────────────────────────────────────────
+*.log
+error_log
