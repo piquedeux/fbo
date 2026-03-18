@@ -331,7 +331,7 @@ $host = (string) ($_SERVER['HTTP_HOST'] ?? 'example.com');
 
 				<article class="item" id="source">
 					<div class="text-post-body">Source code is available on <a
-							href="https://github.com/piquedeux/fbo-blog-template" target="_blank"
+							href="https://github.com/piquedeux/fbo" target="_blank"
 							rel="noopener noreferrer">GitHub</a>.</div>
 					<div class="stamp">For nerds</div>
 				</article>
