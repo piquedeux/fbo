@@ -1019,7 +1019,7 @@ $passwordHash = load_password_hash();
 
 $view = isset($_GET['view']) && in_array($_GET['view'], ['grid', 'single'], true)
 	? $_GET['view']
-	: (isset($_SERVER['HTTP_USER_AGENT']) && preg_match('/Mobile|Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i', $_SERVER['HTTP_USER_AGENT']) ? 'single' : 'grid');
+	: 'grid';
 $editMode = isset($_GET['edit']) && $_GET['edit'] === '1';
 $composeMode = isset($_GET['compose']) && $_GET['compose'] === '1';
 $shuffleRequested = isset($_GET['shuffle']) && (string) $_GET['shuffle'] === '1';
@@ -1030,7 +1030,9 @@ if ($composeMode) {
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $fromPage = max(1, (int) ($_GET['from_page'] ?? $page));
 $requestedPostId = trim((string) ($_GET['post_id'] ?? ''));
-$showIntroAnimation = (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') && empty($_GET);
+$introQuery = $_GET;
+unset($introQuery['blog']);
+$showIntroAnimation = (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') && empty($introQuery);
 $adminAuthed = !empty($_SESSION[ADMIN_SESSION_KEY]);
 $authError = '';
 
@@ -1670,7 +1672,7 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 				<?php $postLocationDisplay = ($view === 'single' && $postLocationCoords !== '') ? $postLocationCoords : $postLocationLabel; ?>
 				<?php $postLocationIsCoordsOnly = ($view === 'grid' && $postLocationCoords !== '' && $postLocationDisplay === $postLocationCoords); ?>
 				<?php $postLocationShort = $postLocationDisplay !== '' ? (preg_split('/\s+/', $postLocationDisplay, 2)[0] ?? $postLocationDisplay) : ''; ?>
-				<article class="item<?= $isPinned ? ' is-pinned' : '' ?>"
+				<article class="item post-type-<?= htmlspecialchars($postType, ENT_QUOTES, 'UTF-8') ?><?= $isPinned ? ' is-pinned' : '' ?>"
 					data-post-id="<?= htmlspecialchars((string) $post['id'], ENT_QUOTES, 'UTF-8') ?>"
 					data-post-type="<?= htmlspecialchars($postType, ENT_QUOTES, 'UTF-8') ?>"
 					data-media-path="<?= htmlspecialchars($postMediaPath, ENT_QUOTES, 'UTF-8') ?>">
