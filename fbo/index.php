@@ -1736,7 +1736,7 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 										<path d="M12 11C12.5523 11 13 10.5523 13 10C13 9.44772 12.5523 9 12 9C11.4477 9 11 9.44772 11 10C11 10.5523 11.4477 11 12 11Z" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"></path>
 									</svg>
 								</span>
-								<span class="location-stamp-full"><?= htmlspecialchars($postLocationDisplay, ENT_QUOTES, 'UTF-8') ?></span>
+								<span class="location-stamp-text-window"><span class="location-stamp-full"><?= htmlspecialchars($postLocationDisplay, ENT_QUOTES, 'UTF-8') ?></span></span>
 								<span class="location-stamp-short"><?= htmlspecialchars($postLocationShort, ENT_QUOTES, 'UTF-8') ?></span>
 							</button>
 						<?php endif; ?>

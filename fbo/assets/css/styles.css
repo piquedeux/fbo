@@ -667,12 +667,16 @@ audio {
 	border: 0;
 	background: transparent;
 	color: var(--muted);
+	display: inline-flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 4px;
 	padding: 7px 9px;
 	font-size: 11px;
 	line-height: 1.2;
-	letter-spacing: 0.02em;
 	cursor: pointer;
-	max-width: 52%;
+	max-width: 50%;
+	min-width: 0;
 	text-align: right;
 	text-overflow: clip;
 	overflow: hidden;
@@ -709,8 +713,32 @@ audio {
 	display: none;
 }
 
+.location-stamp-text-window {
+	display: inline-block;
+	max-width: 100%;
+	overflow: hidden;
+	vertical-align: top;
+}
+
 .location-stamp-full {
-	display: inline;
+	display: inline-block;
+	white-space: nowrap;
+}
+
+@media (min-width: 701px) {
+	.location-stamp.location-stamp-marquee .location-stamp-full {
+		padding-right: 1.25rem;
+		animation: location-stamp-marquee var(--location-marquee-duration, 10s) linear infinite;
+	}
+}
+
+@keyframes location-stamp-marquee {
+	0% {
+		transform: translateX(0);
+	}
+	100% {
+		transform: translateX(calc(-1 * var(--location-marquee-shift, 0px)));
+	}
 }
 
 .archive.grid .location-stamp-full {
@@ -887,6 +915,7 @@ audio {
 		flex: 0 0 auto;
 		max-width: none;
 		padding: 6px 4px;
+		gap: 0;
 		overflow: visible;
 		font-size: 9px;
 	}

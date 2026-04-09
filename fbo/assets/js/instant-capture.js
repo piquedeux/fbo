@@ -110,7 +110,6 @@
 
         // Audio recording
         let mediaRecorder = null;
-        let audioRecorderMime = '';
         let audioChunks = [];
         let audioStream = null;
         let audioContext = null;
@@ -200,7 +199,7 @@
             }
 
             if (mediaRecorder && mediaRecorder.state === 'recording') {
-                recordBtn.disabled = true;
+                // stop
                 mediaRecorder.stop();
                 return;
             }
@@ -239,23 +238,32 @@
                 return;
             }
 
-            audioRecorderMime = recorderMime;
             mediaRecorder = new MediaRecorder(audioStream, { mimeType: recorderMime });
             audioChunks = [];
             startVisualizer(audioStream);
             recordBtn.classList.add('ui-btn-record-live', 'active');
-            recordBtn.textContent = 'Stop audio';
+
+            const stopBtn = document.createElement('button');
+            stopBtn.type = 'button';
+            stopBtn.className = 'ui-btn ui-btn-record-stop';
+            stopBtn.textContent = 'Stop recording';
+            stopBtn.id = 'stopRecordBtn';
+            heroActions.appendChild(stopBtn);
+
+            stopBtn.addEventListener('click', () => {
+                if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+            });
 
             mediaRecorder.addEventListener('dataavailable', (e) => {
                 if (e.data && e.data.size) audioChunks.push(e.data);
             });
 
             mediaRecorder.addEventListener('stop', () => {
-                const blobType = audioRecorderMime.includes('mp4') ? 'audio/mp4' : audioRecorderMime;
+                const blobType = recorderMime.includes('mp4') ? 'audio/mp4' : recorderMime;
                 const blob = new Blob(audioChunks, { type: blobType });
                 const filename = 'recording_' + Date.now() + (
-                    audioRecorderMime.includes('ogg') ? '.ogg'
-                        : audioRecorderMime.includes('webm') ? '.webm'
+                    recorderMime.includes('ogg') ? '.ogg'
+                        : recorderMime.includes('webm') ? '.webm'
                             : '.m4a'
                 );
                 const file = new File([blob], filename, { type: blobType });
@@ -268,10 +276,8 @@
                     audioStream = null;
                 }
                 mediaRecorder = null;
-                audioRecorderMime = '';
                 recordBtn.classList.remove('ui-btn-record-live', 'active');
-                recordBtn.textContent = 'Record audio';
-                recordBtn.disabled = false;
+                stopBtn.remove();
             });
 
             mediaRecorder.start();
@@ -295,12 +301,16 @@
             let selectedPlace = null;
             let currentFacingMode = 'environment';
             let hasMultipleCameras = false;
+            let preferredDeviceId = '';
+            let keydownHandler = null;
 
             const overlay = document.createElement('div');
             overlay.className = 'instant-capture-overlay';
 
             const wrapper = document.createElement('div');
             wrapper.className = 'instant-capture-modal';
+            wrapper.setAttribute('role', 'dialog');
+            wrapper.setAttribute('aria-modal', 'true');
 
             const frame = document.createElement('div');
             frame.className = 'instant-capture-frame';
@@ -361,6 +371,14 @@
             primaryBtn.className = 'ui-btn';
             primaryBtn.textContent = mode === 'video' ? 'Start video' : 'Take photo';
 
+            const stopBtn = mode === 'video' ? document.createElement('button') : null;
+            if (stopBtn) {
+                stopBtn.type = 'button';
+                stopBtn.className = 'ui-btn';
+                stopBtn.textContent = 'Stop';
+                stopBtn.hidden = true;
+            }
+
             const keepBtn = document.createElement('button');
             keepBtn.type = 'button';
             keepBtn.className = 'ui-btn ui-btn-strong';
@@ -384,9 +402,22 @@
             flipBtn.textContent = 'Flip camera';
             flipBtn.hidden = true;
 
+            const cameraSelect = document.createElement('select');
+            cameraSelect.className = 'upload-auth-input instant-capture-camera-select';
+            cameraSelect.hidden = true;
+            cameraSelect.setAttribute('aria-label', 'Choose camera');
+
+            const setHidden = (el, hidden) => {
+                if (!el) return;
+                el.hidden = hidden;
+                el.style.display = hidden ? 'none' : '';
+            };
+
             controls.appendChild(primaryBtn);
+            if (stopBtn) controls.appendChild(stopBtn);
             controls.appendChild(keepBtn);
             controls.appendChild(retakeBtn);
+            controls.appendChild(cameraSelect);
             controls.appendChild(flipBtn);
             controls.appendChild(closeBtn);
 
@@ -494,17 +525,140 @@
                     URL.revokeObjectURL(previewUrl);
                     previewUrl = '';
                 }
+                if (keydownHandler) {
+                    document.removeEventListener('keydown', keydownHandler);
+                    keydownHandler = null;
+                }
                 overlay.remove();
             };
 
-            const openCamera = async () => {
-                const mediaConstraints = mode === 'video'
-                    ? { video: { facingMode: { ideal: currentFacingMode } }, audio: true }
-                    : { video: { facingMode: { ideal: currentFacingMode } }, audio: false };
+            overlay.addEventListener('click', (event) => {
+                if (event.target === overlay) cleanup();
+            });
+
+            keydownHandler = (event) => {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    cleanup();
+                    return;
+                }
+
+                if (event.key !== 'Enter' && event.key !== ' ') {
+                    return;
+                }
+
+                const target = event.target;
+                const tagName = target && typeof target.tagName === 'string' ? target.tagName.toLowerCase() : '';
+                if (tagName === 'input' || tagName === 'select' || tagName === 'textarea' || (target && target.isContentEditable)) {
+                    return;
+                }
+
+                const actionBtn = !keepBtn.hidden
+                    ? keepBtn
+                    : stopBtn && !stopBtn.hidden
+                        ? stopBtn
+                        : !primaryBtn.hidden
+                            ? primaryBtn
+                            : null;
+                if (!actionBtn) return;
+                event.preventDefault();
+                actionBtn.click();
+            };
+            document.addEventListener('keydown', keydownHandler);
+
+            const refreshCameraControls = async () => {
+                if (!navigator.mediaDevices || typeof navigator.mediaDevices.enumerateDevices !== 'function') {
+                    hasMultipleCameras = false;
+                    setHidden(flipBtn, true);
+                    setHidden(cameraSelect, true);
+                    return;
+                }
 
                 try {
-                    camStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+                    hasMultipleCameras = videoInputs.length > 1;
+                    const isCoarsePointer = typeof window.matchMedia === 'function'
+                        ? window.matchMedia('(pointer: coarse)').matches
+                        : false;
+                    const frontPattern = /(front|user|facetime|selfie)/i;
+                    const rearPattern = /(back|rear|environment|world)/i;
+                    const hasFrontCamera = videoInputs.some((d) => frontPattern.test(String(d.label || '')));
+                    const hasRearCamera = videoInputs.some((d) => rearPattern.test(String(d.label || '')));
+                    const canFlipFacingMode = hasMultipleCameras && isCoarsePointer && hasFrontCamera && hasRearCamera;
+
+                    cameraSelect.innerHTML = '';
+                    if (!hasMultipleCameras) {
+                        setHidden(cameraSelect, true);
+                        setHidden(flipBtn, true);
+                        return;
+                    }
+
+                    const activeTrack = camStream && camStream.getVideoTracks ? camStream.getVideoTracks()[0] : null;
+                    const activeDeviceId = activeTrack && typeof activeTrack.getSettings === 'function'
+                        ? String(activeTrack.getSettings().deviceId || '')
+                        : '';
+
+                    videoInputs.forEach((device, index) => {
+                        const option = document.createElement('option');
+                        option.value = device.deviceId || '';
+                        option.textContent = device.label || `Camera ${index + 1}`;
+                        cameraSelect.appendChild(option);
+                    });
+
+                    const wantedDeviceId = preferredDeviceId || activeDeviceId || (videoInputs[0] && videoInputs[0].deviceId) || '';
+                    if (wantedDeviceId) {
+                        cameraSelect.value = wantedDeviceId;
+                        preferredDeviceId = wantedDeviceId;
+                    }
+
+                    // Keep camera switching controls only in live camera mode.
+                    if (!liveVideo.hidden) {
+                        setHidden(cameraSelect, false);
+                        setHidden(flipBtn, !canFlipFacingMode);
+                    }
                 } catch (e) {
+                    hasMultipleCameras = false;
+                    setHidden(cameraSelect, true);
+                    setHidden(flipBtn, true);
+                }
+            };
+
+            const openCamera = async () => {
+                const wantsAudio = mode === 'video';
+                const tryGetStream = async (includeAudio) => {
+                    const candidates = [];
+
+                    if (preferredDeviceId) {
+                        candidates.push({
+                            video: { deviceId: { exact: preferredDeviceId } },
+                            audio: includeAudio,
+                        });
+                    }
+
+                    candidates.push({
+                        video: { facingMode: { ideal: currentFacingMode } },
+                        audio: includeAudio,
+                    });
+
+                    candidates.push({ video: true, audio: includeAudio });
+
+                    for (const mediaConstraints of candidates) {
+                        try {
+                            return await navigator.mediaDevices.getUserMedia(mediaConstraints);
+                        } catch (e) {
+                            // Try the next constraint profile.
+                        }
+                    }
+                    return null;
+                };
+
+                camStream = await tryGetStream(wantsAudio);
+                if (!camStream && wantsAudio) {
+                    camStream = await tryGetStream(false);
+                }
+
+                if (!camStream) {
                     alert('Permission denied or no camera available.');
                     overlay.remove();
                     return false;
@@ -515,28 +669,17 @@
                 imagePreview.hidden = true;
                 videoPreview.hidden = true;
                 locationWrap.hidden = true;
-                primaryBtn.hidden = false;
-                keepBtn.hidden = true;
-                retakeBtn.hidden = true;
-                primaryBtn.disabled = false;
-                primaryBtn.textContent = mode === 'video' ? 'Start video' : 'Take photo';
+                setHidden(primaryBtn, false);
+                setHidden(stopBtn, true);
+                setHidden(keepBtn, true);
+                setHidden(retakeBtn, true);
                 selectedPlace = null;
                 locationInput.value = '';
                 clearSuggestions();
                 previewFile = null;
                 stopRecordTimers();
 
-                if (navigator.mediaDevices && typeof navigator.mediaDevices.enumerateDevices === 'function') {
-                    try {
-                        const devices = await navigator.mediaDevices.enumerateDevices();
-                        hasMultipleCameras = devices.filter((d) => d.kind === 'videoinput').length > 1;
-                    } catch (e) {
-                        hasMultipleCameras = false;
-                    }
-                } else {
-                    hasMultipleCameras = false;
-                }
-                flipBtn.hidden = !hasMultipleCameras;
+                await refreshCameraControls();
                 return true;
             };
 
@@ -560,17 +703,18 @@
             const capturePhoto = () => {
                 const srcW = liveVideo.videoWidth || 1280;
                 const srcH = liveVideo.videoHeight || 720;
-                const side = Math.min(srcW, srcH);
-                const sx = Math.floor((srcW - side) / 2);
-                const sy = Math.floor((srcH - side) / 2);
+                const maxEdge = 1600;
+                const scale = Math.min(1, maxEdge / Math.max(srcW, srcH));
+                const outW = Math.max(2, Math.round(srcW * scale));
+                const outH = Math.max(2, Math.round(srcH * scale));
 
                 const canvas = document.createElement('canvas');
-                canvas.width = 1080;
-                canvas.height = 1080;
+                canvas.width = outW;
+                canvas.height = outH;
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return;
 
-                ctx.drawImage(liveVideo, sx, sy, side, side, 0, 0, canvas.width, canvas.height);
+                ctx.drawImage(liveVideo, 0, 0, srcW, srcH, 0, 0, outW, outH);
                 canvas.toBlob((blob) => {
                     if (!blob) return;
                     previewFile = new File([blob], 'photo_' + Date.now() + '.jpg', { type: 'image/jpeg' });
@@ -582,11 +726,14 @@
                     imagePreview.src = previewUrl;
                     imagePreview.hidden = false;
                     liveVideo.hidden = true;
+                    setHidden(cameraSelect, true);
+                    setHidden(flipBtn, true);
                     stopStream();
                     locationWrap.hidden = false;
-                    primaryBtn.hidden = true;
-                    keepBtn.hidden = false;
-                    retakeBtn.hidden = false;
+                    setHidden(primaryBtn, true);
+                    setHidden(stopBtn, true);
+                    setHidden(keepBtn, false);
+                    setHidden(retakeBtn, false);
                 }, 'image/jpeg', 0.9);
             };
 
@@ -597,7 +744,14 @@
                 }
 
                 const chunks = [];
-                const candidates = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4'];
+                const candidates = [
+                    'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+                    'video/mp4',
+                    'video/webm;codecs=vp9,opus',
+                    'video/webm;codecs=vp8,opus',
+                    'video/webm',
+                    'video/ogg;codecs=theora,opus',
+                ];
                 const mimeType = candidates.find((type) => {
                     return typeof MediaRecorder.isTypeSupported === 'function'
                         ? MediaRecorder.isTypeSupported(type)
@@ -605,7 +759,7 @@
                 }) || '';
 
                 if (!mimeType) {
-                    alert('MP4 video recording is not supported on this device/browser.');
+                    alert('Video recording is not supported on this device/browser.');
                     return;
                 }
 
@@ -623,7 +777,7 @@
                 recorder.addEventListener('stop', () => {
                     stopRecordTimers();
                     const type = (recorder && recorder.mimeType) ? recorder.mimeType : 'video/mp4';
-                    const ext = 'mp4';
+                    const ext = type.includes('webm') ? 'webm' : type.includes('ogg') ? 'ogv' : 'mp4';
                     const blob = new Blob(chunks, { type });
                     previewFile = new File([blob], 'video_' + Date.now() + '.' + ext, { type });
 
@@ -632,14 +786,19 @@
                     }
                     previewUrl = URL.createObjectURL(blob);
                     videoPreview.src = previewUrl;
+                    videoPreview.preload = 'metadata';
+                    videoPreview.load();
                     videoPreview.hidden = false;
                     liveVideo.hidden = true;
+                    setHidden(cameraSelect, true);
+                    setHidden(flipBtn, true);
                     stopStream();
 
                     locationWrap.hidden = false;
-                    primaryBtn.hidden = true;
-                    keepBtn.hidden = false;
-                    retakeBtn.hidden = false;
+                    setHidden(primaryBtn, true);
+                    setHidden(stopBtn, true);
+                    setHidden(keepBtn, false);
+                    setHidden(retakeBtn, false);
                     recorder = null;
                 });
 
@@ -647,7 +806,12 @@
                 elapsedSec = 0;
                 recordingInfo.textContent = 'Recording 0s / 10s';
                 recordingInfo.hidden = false;
-                primaryBtn.textContent = 'Stop video';
+                setHidden(primaryBtn, true);
+                setHidden(keepBtn, true);
+                setHidden(retakeBtn, true);
+                setHidden(cameraSelect, true);
+                setHidden(flipBtn, true);
+                setHidden(stopBtn, false);
 
                 elapsedTimer = window.setInterval(() => {
                     elapsedSec += 1;
@@ -663,16 +827,19 @@
 
             primaryBtn.addEventListener('click', () => {
                 if (mode === 'video') {
-                    if (recorder && recorder.state === 'recording') {
-                        primaryBtn.disabled = true;
-                        recorder.stop();
-                        return;
-                    }
                     startVideoRecording();
                     return;
                 }
                 capturePhoto();
             });
+
+            if (stopBtn) {
+                stopBtn.addEventListener('click', () => {
+                    if (recorder && recorder.state === 'recording') {
+                        recorder.stop();
+                    }
+                });
+            }
 
             flipBtn.addEventListener('click', async () => {
                 if (!hasMultipleCameras) return;
@@ -680,6 +847,19 @@
                     return;
                 }
                 currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
+                preferredDeviceId = '';
+                stopStream();
+                await openCamera();
+            });
+
+            cameraSelect.addEventListener('change', async () => {
+                const nextDeviceId = String(cameraSelect.value || '').trim();
+                if (!nextDeviceId || nextDeviceId === preferredDeviceId) return;
+                if (recorder && recorder.state === 'recording') {
+                    cameraSelect.value = preferredDeviceId;
+                    return;
+                }
+                preferredDeviceId = nextDeviceId;
                 stopStream();
                 await openCamera();
             });
@@ -709,7 +889,10 @@
             const opened = await openCamera();
             if (!opened) {
                 clearLocationSelection();
+                return;
             }
+
+            closeBtn.focus();
         };
 
         photoBtn.addEventListener('click', () => {

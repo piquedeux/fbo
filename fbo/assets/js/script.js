@@ -218,7 +218,47 @@
 		temp.remove();
 	};
 
-	document.querySelectorAll('.location-stamp[data-coords]').forEach((btn) => {
+	const isDesktop = () => window.matchMedia('(min-width: 701px)').matches;
+	const refreshLocationMarquee = (btn) => {
+		const textWindow = btn.querySelector('.location-stamp-text-window');
+		const fullTextEl = btn.querySelector('.location-stamp-full');
+		if (!textWindow || !fullTextEl) return;
+
+		btn.classList.remove('location-stamp-marquee');
+		btn.style.removeProperty('--location-marquee-shift');
+		btn.style.removeProperty('--location-marquee-duration');
+
+		if (!isDesktop()) return;
+		if (btn.closest('.archive.grid')) return;
+		if (btn.classList.contains('location-stamp-icon-only')) return;
+
+		const visibleWidth = textWindow.clientWidth;
+		const contentWidth = fullTextEl.scrollWidth;
+		if (!Number.isFinite(visibleWidth) || !Number.isFinite(contentWidth)) return;
+
+		const overflow = contentWidth - visibleWidth;
+		if (overflow <= 4) return;
+
+		btn.classList.add('location-stamp-marquee');
+		btn.style.setProperty('--location-marquee-shift', `${Math.ceil(overflow)}px`);
+		const durationSec = Math.max(6, Math.min(22, (contentWidth + visibleWidth) / 42));
+		btn.style.setProperty('--location-marquee-duration', `${durationSec.toFixed(2)}s`);
+	};
+
+	const locationButtons = Array.from(document.querySelectorAll('.location-stamp[data-coords]'));
+	const refreshAllLocationMarquees = () => {
+		locationButtons.forEach((btn) => {
+			refreshLocationMarquee(btn);
+		});
+	};
+
+	window.addEventListener('resize', () => {
+		window.requestAnimationFrame(refreshAllLocationMarquees);
+	});
+	window.addEventListener('load', refreshAllLocationMarquees);
+	window.requestAnimationFrame(refreshAllLocationMarquees);
+
+	locationButtons.forEach((btn) => {
 		if (btn.closest('.archive.grid')) {
 			btn.removeAttribute('title');
 			return;
@@ -244,12 +284,14 @@
 					if (fullTextEl) fullTextEl.textContent = 'copied to clipboard';
 					if (shortTextEl) shortTextEl.textContent = 'copied';
 				}
+				refreshLocationMarquee(btn);
 			} catch (error) {
 				btn.setAttribute('title', 'Could not copy');
 				if (showMobileHint) {
 					if (fullTextEl) fullTextEl.textContent = 'copy failed';
 					if (shortTextEl) shortTextEl.textContent = 'failed';
 				}
+				refreshLocationMarquee(btn);
 			}
 
 			if (resetTimer !== null) {
@@ -259,9 +301,12 @@
 				btn.setAttribute('title', originalTitle);
 				if (fullTextEl) fullTextEl.textContent = originalFullText;
 				if (shortTextEl) shortTextEl.textContent = originalShortText;
+				refreshLocationMarquee(btn);
 				resetTimer = null;
 			}, 1500);
 		});
+
+		refreshLocationMarquee(btn);
 	});
 })();
 
