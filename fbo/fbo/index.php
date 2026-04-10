@@ -312,12 +312,16 @@ $host = (string) ($_SERVER['HTTP_HOST'] ?? 'example.com');
 						<details class="fbo-legal-item">
 							<summary>Annoying stuff</summary>
 							<div class="fbo-legal-copy">
+								<p><strong>Imprint (§ 5 TMG)</strong></p>
+								<p>MG<br>Bieberstr 67<br>63039 Offenbach<br>Germany</p>
+
 								<p><strong>Privacy Policy (GDPR)</strong></p>
-								<p><strong>1. Hosting and server logs</strong><br>When you access this website, technically required data (for example IP address, date/time, requested page, browser details) may be processed in server log files to ensure secure operation (Art. 6(1)(f) GDPR).</p>
-								<p><strong>2. Contact</strong><br>If you contact us, your transmitted data is processed to handle your request (Art. 6(1)(b) or (f) GDPR).</p>
-								<p><strong>3. Storage period</strong><br>Personal data is stored only as long as required for the stated purposes or legal retention duties.</p>
-								<p><strong>4. Your rights</strong><br>You have rights of access, rectification, deletion, restriction, data portability, and objection where applicable, plus the right to lodge a complaint with a supervisory authority.</p>
-								<p><strong>5. Cookies</strong><br>This website currently does not use non-essential tracking or marketing cookies. If this changes, a consent banner will be shown before such cookies are set.</p>
+								<p><strong>1. Controller</strong><br>MG, Bieberstr 67, 63039 Offenbach, Germany.</p>
+								<p><strong>2. Hosting and server logs</strong><br>When you access this website, technically required data (for example IP address, date/time, requested page, browser details) may be processed in server log files to ensure secure operation (Art. 6(1)(f) GDPR).</p>
+								<p><strong>3. Contact</strong><br>If you contact us, your transmitted data is processed to handle your request (Art. 6(1)(b) or (f) GDPR).</p>
+								<p><strong>4. Storage period</strong><br>Personal data is stored only as long as required for the stated purposes or legal retention duties.</p>
+								<p><strong>5. Your rights</strong><br>You have rights of access, rectification, deletion, restriction, data portability, and objection where applicable, plus the right to lodge a complaint with a supervisory authority.</p>
+								<p><strong>6. Cookies</strong><br>This website currently does not use non-essential tracking or marketing cookies. If this changes, a consent banner will be shown before such cookies are set.</p>
 								<p><strong>Cookie note</strong><br>No non-essential tracking cookies are active right now, so no cookie banner is currently displayed.</p>
 							</div>
 						</details>
@@ -327,7 +331,7 @@ $host = (string) ($_SERVER['HTTP_HOST'] ?? 'example.com');
 
 				<article class="item" id="source">
 					<div class="text-post-body">Source code is available on <a
-							href="https://github.com/piquedeux/fbo" target="_blank"
+							href="https://github.com/piquedeux/fbo-blog-template" target="_blank"
 							rel="noopener noreferrer">GitHub</a>.</div>
 					<div class="stamp">For nerds</div>
 				</article>

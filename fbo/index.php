@@ -1019,7 +1019,7 @@ $passwordHash = load_password_hash();
 
 $view = isset($_GET['view']) && in_array($_GET['view'], ['grid', 'single'], true)
 	? $_GET['view']
-	: 'grid';
+	: (isset($_SERVER['HTTP_USER_AGENT']) && preg_match('/Mobile|Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i', $_SERVER['HTTP_USER_AGENT']) ? 'single' : 'grid');
 $editMode = isset($_GET['edit']) && $_GET['edit'] === '1';
 $composeMode = isset($_GET['compose']) && $_GET['compose'] === '1';
 $shuffleRequested = isset($_GET['shuffle']) && (string) $_GET['shuffle'] === '1';
@@ -1030,9 +1030,7 @@ if ($composeMode) {
 $page = max(1, (int) ($_GET['page'] ?? 1));
 $fromPage = max(1, (int) ($_GET['from_page'] ?? $page));
 $requestedPostId = trim((string) ($_GET['post_id'] ?? ''));
-$introQuery = $_GET;
-unset($introQuery['blog']);
-$showIntroAnimation = (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') && empty($introQuery);
+$showIntroAnimation = (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') && empty($_GET);
 $adminAuthed = !empty($_SESSION[ADMIN_SESSION_KEY]);
 $authError = '';
 
@@ -1736,7 +1734,7 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 										<path d="M12 11C12.5523 11 13 10.5523 13 10C13 9.44772 12.5523 9 12 9C11.4477 9 11 9.44772 11 10C11 10.5523 11.4477 11 12 11Z" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"></path>
 									</svg>
 								</span>
-								<span class="location-stamp-text-window"><span class="location-stamp-full"><?= htmlspecialchars($postLocationDisplay, ENT_QUOTES, 'UTF-8') ?></span></span>
+								<span class="location-stamp-full"><?= htmlspecialchars($postLocationDisplay, ENT_QUOTES, 'UTF-8') ?></span>
 								<span class="location-stamp-short"><?= htmlspecialchars($postLocationShort, ENT_QUOTES, 'UTF-8') ?></span>
 							</button>
 						<?php endif; ?>
