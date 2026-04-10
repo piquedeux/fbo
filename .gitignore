@@ -8,6 +8,7 @@ multi-tenant/blogs/*/
 !multi-tenant/blogs/.gitkeep
 fbo/media/*
 !fbo/media/.gitkeep
+fbo/assets/fonts/*
 
 debug.php
 **/debug.php
