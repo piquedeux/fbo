@@ -1,5 +1,6 @@
 .env
 !.env.example
+**/.htaccess
 multi-tenant/config.php
 !multi-tenant/config.example.php
 fbo/smtp-config.php
@@ -25,3 +26,4 @@ debug.php
 
 *.log
 error_log
+.gitignore
