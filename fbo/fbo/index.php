@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
 
+if (session_status() === PHP_SESSION_NONE) {
+	session_start();
+}
+
 function local_asset_url(string $relativePath): string
 {
 	$cleanPath = ltrim($relativePath, '/');
@@ -32,6 +36,11 @@ function fbo_format_date(string $date): string
 
 $scheme = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off') ? 'https' : 'http';
 $host = (string) ($_SERVER['HTTP_HOST'] ?? 'example.com');
+$createBlogHref = '../';
+$lastBlogWord = strtolower(trim((string) ($_SESSION['fbo_last_blog_word'] ?? '')));
+if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) === 1) {
+	$createBlogHref = '/blog/' . rawurlencode($lastBlogWord);
+}
 ?>
 <!doctype html>
 <html lang="en">
@@ -234,7 +243,7 @@ $host = (string) ($_SERVER['HTTP_HOST'] ?? 'example.com');
 			<a href="#" onclick="history.back(); return false;" class="logo logo-link">FBO Project</a>
 			<div class="hero-right">
 				<div class="hero-actions">
-					<a href="/" class="ui-btn">Create blog</a>
+					<a href="<?= htmlspecialchars($createBlogHref, ENT_QUOTES, 'UTF-8') ?>" class="ui-btn">Create blog</a>
 					<a href="https://www.instagram.com/fbeing.online" target="_blank" rel="noopener noreferrer"
 						class="text-link">IG</a>
 					<a href="mailto:fboproject@proton.me" class="text-link">M</a>
@@ -398,7 +407,14 @@ $host = (string) ($_SERVER['HTTP_HOST'] ?? 'example.com');
 
 				if (countEl) {
 					var shown = matched.filter(function (i) { return !i.hidden; }).length;
-					countEl.textContent = q !== '' ? '(' + shown + ' of ' + allItems.length + ')' : '(' + allItems.length + ')';
+					var isCappedAtTwenty = isMobile() && q === '' && visibleEnd === PAGE_SIZE && matched.length > visibleEnd;
+					if (q !== '') {
+						countEl.textContent = '(' + shown + '/' + allItems.length + ')';
+					} else {
+						countEl.textContent = (isMobile()
+							? '(' + shown + '/' + allItems.length + ')'
+							: '(' + allItems.length + ')') + (isCappedAtTwenty ? ' search for more' : '');
+					}
 				}
 			}
 

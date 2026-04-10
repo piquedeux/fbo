@@ -86,7 +86,9 @@ $previewUrl = $scheme . '://' . $host . '/blog/' . rawurlencode($previewWord);
 					<a href="/fbo/fbo" class="fbo fbo-link">FBO</a>
 				</div>
 			</div>
-
+			
+			<h2 class="onboarding-header">Welcome to the <a class="fbo-highlighted" href="/fbo/fbo"><span class="fbo-highlighted-ghost" aria-hidden="true">FBO</span><span class="fbo-highlighted-text" aria-hidden="true"><span>F</span><span>B</span><span>O</span></span><span class="sr-only">FBO</span></a> Project.</h2>
+			<h4 class="onboarding-subtitle">A blogging tool for people tired of platforms. Open source. No ads. No app. No ai.</h4>
 
 			<p class="subtitle-line onboarding-lead">Create your private blog on the <a href="/fbo/fbo/#server">FBO Project Server</a>. Pick a BLOGNAME. You don't need to register an email now, but for resetting your password, you could later.</p>
 			<p class="subtitle-line">1–24 characters. Letters, numbers _ and - only.</p>
@@ -107,12 +109,11 @@ $previewUrl = $scheme . '://' . $host . '/blog/' . rawurlencode($previewWord);
 				<div class="hero-actions">
 					<button type="submit" name="create_blog" value="1" class="ui-btn">Create blog &rarr;</button>
 				</div>
+				<div class="subtitle-line login-note">or log in on the page of your existing blog (<span class="onboarding-url-preview">www.fbeing.online/blog/YOURBLOG</span>)</div>
 			</form>
 
 			<?php if ($blogs !== []): ?>
-				<div class="subtitle-line">
-					<strong>Existing blogs</strong>
-					<span class="ob-blog-count" id="obCount">(<?= count($blogs) ?>)</span>
+				<div class="subtitle-line existing-blogs">Existing blogs<span class="ob-blog-count" id="obCount">(<?= min(20, count($blogs)) ?>/<?= count($blogs) ?>)<?= count($blogs) > 20 ? ' search for more' : '' ?></span>
 				</div>
 
 				<input type="search" class="ob-search" id="obSearch" placeholder="Search by name or URL…" autocomplete="off"

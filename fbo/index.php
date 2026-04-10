@@ -926,6 +926,7 @@ define('ADMIN_SESSION_KEY', 'fbo_admin_auth' . $_sk);
 define('FLASH_MESSAGE_SESSION_KEY', 'fbo_flash' . $_sk);
 define('OTP_DISPLAY_SESSION_KEY', 'fbo_otp_once' . $_sk);
 define('OTP_RESET_SESSION_KEY', 'fbo_otp_reset' . $_sk);
+define('LAST_BLOG_SESSION_KEY', 'fbo_last_blog_word');
 unset($_blogRaw, $_tmp, $_sk);
 
 $isOtpReset = !empty($_SESSION[OTP_RESET_SESSION_KEY]);
@@ -998,6 +999,9 @@ if (onboarding_required()) {
 			save_password_hash($password);
 			unset($_SESSION[OTP_RESET_SESSION_KEY]);
 			$_SESSION[ADMIN_SESSION_KEY] = true;
+			if ($_blogSafe !== '') {
+				$_SESSION[LAST_BLOG_SESSION_KEY] = $_blogSafe;
+			}
 			set_flash_message('Password updated.');
 			header('Location: ?' . $blogQ . 'edit=1');
 			exit;
@@ -1034,6 +1038,10 @@ $showIntroAnimation = (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') && empty
 $adminAuthed = !empty($_SESSION[ADMIN_SESSION_KEY]);
 $authError = '';
 
+if ($adminAuthed && $_blogSafe !== '') {
+	$_SESSION[LAST_BLOG_SESSION_KEY] = $_blogSafe;
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['admin_logout'])) {
 	unset($_SESSION[ADMIN_SESSION_KEY]);
 	header('Location: ' . blog_self_url());
@@ -1046,6 +1054,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['admin_logi
 	$redirectAfterLogin = ($loginTarget === 'compose') ? '?' . $blogQ . 'compose=1' : '?' . $blogQ . 'edit=1';
 	if ($passwordHash !== '' && password_verify($inputPassword, $passwordHash)) {
 		$_SESSION[ADMIN_SESSION_KEY] = true;
+		if ($_blogSafe !== '') {
+			$_SESSION[LAST_BLOG_SESSION_KEY] = $_blogSafe;
+		}
 		header('Location: ' . $redirectAfterLogin);
 		exit;
 	}

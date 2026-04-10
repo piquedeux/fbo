@@ -116,9 +116,8 @@
 
 		if (count) {
 			const visibleCount = query === '' ? Math.min(matches.length, visibleLimit) : matches.length;
-			count.textContent = query !== ''
-				? `(${visibleCount} of ${items.length})`
-				: `(${items.length})`;
+			const isCappedAtTwenty = query === '' && visibleLimit === pageSize && matches.length > visibleLimit;
+			count.textContent = `(${visibleCount}/${items.length})${isCappedAtTwenty ? ' search for more' : ''}`;
 		}
 	};
 
