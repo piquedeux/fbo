@@ -296,7 +296,7 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 		<div class="fbo-info-col">
 			<main class="archive single" id="idea">
 				<article class="item">
-					<div class="text-post-body">FBO is a blogging tool built around one idea: your content belongs to you. You get your own URL, you set a name, you write and publish. No feed to optimize for, no follower count to grow, no platform making decisions about who sees your media. What you post stays yours. The web as a place to put things, not to perform.</div>
+					<div class="text-post-body">FBO is a Blog template built around one idea: your content belongs to you. You get your own URL, you set a name, you start  blogging. No feed to optimize for, no follower count to grow, no platform making decisions about who sees your media. What you post stays yours. The web as a place to put things, not to perform.</div>
 					<div class="stamp">Core ideas</div>
 				</article>
 				<article class="item" id="architecture">
