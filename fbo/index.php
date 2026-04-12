@@ -698,6 +698,118 @@ function extract_media_location_from_file(string $path, string $type): ?array
 	];
 }
 
+function parse_capture_datetime_to_timestamp(string $raw): ?int
+{
+	$raw = trim($raw);
+	if ($raw === '') {
+		return null;
+	}
+
+	$formats = [
+		'Y:m:d H:i:sP',
+		'Y:m:d H:i:s',
+		'Y-m-d H:i:sP',
+		'Y-m-d H:i:s',
+		DateTimeInterface::ATOM,
+		DateTimeInterface::RFC3339,
+		DateTimeInterface::RFC3339_EXTENDED,
+	];
+
+	foreach ($formats as $format) {
+		$date = DateTimeImmutable::createFromFormat($format, $raw);
+		if ($date instanceof DateTimeImmutable) {
+			$errors = DateTimeImmutable::getLastErrors();
+			if (($errors['warning_count'] ?? 0) === 0 && ($errors['error_count'] ?? 0) === 0) {
+				$timestamp = $date->getTimestamp();
+				if ($timestamp > 0) {
+					return $timestamp;
+				}
+			}
+		}
+	}
+
+	$parsed = strtotime($raw);
+	if (is_int($parsed) && $parsed > 0) {
+		return $parsed;
+	}
+
+	return null;
+}
+
+function extract_image_capture_timestamp(string $path): ?int
+{
+	if (!function_exists('exif_read_data')) {
+		return null;
+	}
+
+	$exif = @exif_read_data($path, null, true);
+	if (!is_array($exif)) {
+		return null;
+	}
+
+	$candidates = [
+		(string) (($exif['EXIF']['DateTimeOriginal'] ?? '')),
+		(string) (($exif['EXIF']['DateTimeDigitized'] ?? '')),
+		(string) (($exif['IFD0']['DateTime'] ?? '')),
+	];
+
+	foreach ($candidates as $candidate) {
+		$timestamp = parse_capture_datetime_to_timestamp($candidate);
+		if ($timestamp !== null) {
+			return $timestamp;
+		}
+	}
+
+	return null;
+}
+
+function extract_video_capture_timestamp(string $path): ?int
+{
+	if (!function_exists('shell_exec') || !is_callable('shell_exec')) {
+		return null;
+	}
+
+	$ffprobe = trim((string) @shell_exec('command -v ffprobe 2>/dev/null'));
+	if ($ffprobe === '' || !is_file($ffprobe)) {
+		return null;
+	}
+
+	$command = escapeshellarg($ffprobe)
+		. ' -v error'
+		. ' -show_entries format_tags=creation_time:stream_tags=creation_time'
+		. ' -of default=noprint_wrappers=1:nokey=1 '
+		. escapeshellarg($path)
+		. ' 2>/dev/null';
+
+	$output = @shell_exec($command);
+	if (!is_string($output) || trim($output) === '') {
+		return null;
+	}
+
+	$lines = preg_split('/\R+/', $output) ?: [];
+	foreach ($lines as $line) {
+		$timestamp = parse_capture_datetime_to_timestamp((string) $line);
+		if ($timestamp !== null) {
+			return $timestamp;
+		}
+	}
+
+	return null;
+}
+
+function extract_media_capture_timestamp(string $path, string $type): ?int
+{
+	if ($type === 'image') {
+		return extract_image_capture_timestamp($path);
+	}
+
+	if ($type === 'video') {
+		return extract_video_capture_timestamp($path);
+	}
+
+	return null;
+}
+
 function normalize_post_entry(array $item): ?array
 {
 	$id = trim((string) ($item['id'] ?? ''));
@@ -1257,7 +1369,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 				'type' => $type,
 				'path' => 'media/' . $targetName,
 				'pinned' => false,
-				'timestamp' => $clientUploadTimestamp,
+				'timestamp' => extract_media_capture_timestamp($targetPath, $type) ?? $clientUploadTimestamp,
 			];
 
 			if ($instantLocation !== null && !$manualLocationApplied) {

@@ -183,17 +183,25 @@
 })();
 
 (() => {
-	const formatLocalEu = (tsSec) => {
+	const isMobileGrid = (el) => {
+		if (!(el instanceof Element)) return false;
+		if (!window.matchMedia('(max-width: 700px)').matches) return false;
+		return !!el.closest('.archive.grid');
+	};
+
+	const formatLocalEu = (tsSec, multiline = false) => {
 		const d = new Date(tsSec * 1000);
 		if (Number.isNaN(d.getTime())) return '';
 		const pad = (v) => String(v).padStart(2, '0');
-		return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+		const datePart = `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+		const timePart = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+		return multiline ? `${datePart}\n${timePart}` : `${datePart} ${timePart}`;
 	};
 
 	document.querySelectorAll('.stamp[data-ts]').forEach((el) => {
 		const ts = Number(el.getAttribute('data-ts'));
 		if (!Number.isFinite(ts) || ts <= 0) return;
-		const formatted = formatLocalEu(ts);
+		const formatted = formatLocalEu(ts, isMobileGrid(el));
 		if (formatted) {
 			el.textContent = formatted;
 		}
@@ -336,6 +344,12 @@
 	const body = document.body;
 	const heroHead = document.querySelector('.hero .hero-head');
 	if (!body || !heroHead) return;
+
+	const composeMode = body.dataset?.composeMode === '1';
+	if (composeMode) {
+		body.classList.remove('header-peek');
+		return;
+	}
 
 	let lastY = window.scrollY || 0;
 	let ticking = false;

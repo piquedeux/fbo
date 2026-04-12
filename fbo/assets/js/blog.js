@@ -13,12 +13,14 @@
 	};
 
 	if (toggleBtn) {
-		toggleBtn.addEventListener('click', () => {
-			const open = form.hidden;
-			form.hidden = !open;
-			toggleBtn.classList.toggle('active', open);
-			toggleBtn.textContent = open ? 'Cancel' : 'Post text';
-			if (open) { textarea.focus(); }
+		toggleBtn.addEventListener('click', (e) => {
+			e.preventDefault();
+			const isExpanded = toggleBtn.getAttribute('aria-expanded') === 'true';
+			form.hidden = isExpanded;
+			toggleBtn.setAttribute('aria-expanded', !isExpanded);
+			if (!isExpanded) { 
+				textarea.focus(); 
+			}
 		});
 	}
 
@@ -35,12 +37,18 @@
 	const form = document.getElementById('inlineUploadForm');
 	const preview = document.getElementById('inlineUploadPreview');
 	const empty = document.getElementById('inlineUploadEmpty');
-	const cancelBtn = document.getElementById('cancelInlineUpload');
-	if (!input || !preview || !empty || !cancelBtn || !epochInput || !form) return;
+	if (!input || !preview || !empty || !epochInput || !form) return;
 
 	const imageExt = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif']);
 	const videoExt = new Set(['mp4', 'mov', 'webm', 'm4v']);
 	const audioExt = new Set(['mp3', 'wav', 'flac', 'ogg', 'm4a', 'webm']);
+	let selectedFiles = [];
+
+	const syncInputFiles = () => {
+		const transfer = new DataTransfer();
+		selectedFiles.forEach((file) => transfer.items.add(file));
+		input.files = transfer.files;
+	};
 
 	const clearPreview = () => {
 		preview.innerHTML = '';
@@ -48,18 +56,28 @@
 	};
 
 	const render = () => {
-		epochInput.value = String(Date.now());
+		epochInput.value = selectedFiles.length > 0 ? String(Date.now()) : '';
 		preview.innerHTML = '';
-		const files = Array.from(input.files || []);
-		if (files.length === 0) {
+		if (selectedFiles.length === 0) {
 			empty.style.display = '';
 			return;
 		}
 		empty.style.display = 'none';
 
-		for (const file of files) {
+		selectedFiles.forEach((file, index) => {
 			const card = document.createElement('article');
 			card.className = 'item';
+
+			const removeBtn = document.createElement('button');
+			removeBtn.type = 'button';
+			removeBtn.className = 'upload-preview-remove';
+			removeBtn.setAttribute('aria-label', `Remove ${file.name}`);
+			removeBtn.textContent = 'X';
+			removeBtn.addEventListener('click', () => {
+				selectedFiles = selectedFiles.filter((_, selectedIndex) => selectedIndex !== index);
+				syncInputFiles();
+				render();
+			});
 
 			const mediaWrap = document.createElement('div');
 			mediaWrap.className = 'media-wrap';
@@ -96,17 +114,12 @@
 			stamp.className = 'stamp';
 			stamp.textContent = file.name;
 
+			card.appendChild(removeBtn);
 			card.appendChild(mediaWrap);
 			card.appendChild(stamp);
 			preview.appendChild(card);
-		}
+		});
 	};
-
-	cancelBtn.addEventListener('click', () => {
-		input.value = '';
-		epochInput.value = '';
-		clearPreview();
-	});
 
 	form.addEventListener('submit', () => {
 		if (!epochInput.value) {
@@ -114,7 +127,27 @@
 		}
 	});
 
-	input.addEventListener('change', render);
+	input.addEventListener('change', () => {
+		selectedFiles = Array.from(input.files || []);
+		render();
+	});
+
+	if (!input.files || input.files.length === 0) {
+		clearPreview();
+	}
+})();
+
+(() => {
+	const uploadMediaToggleBtn = document.getElementById('uploadMediaToggleBtn');
+	const inlineUploadForm = document.getElementById('inlineUploadForm');
+	if (!uploadMediaToggleBtn || !inlineUploadForm) return;
+
+	uploadMediaToggleBtn.addEventListener('click', (e) => {
+		e.preventDefault();
+		const isExpanded = uploadMediaToggleBtn.getAttribute('aria-expanded') === 'true';
+		inlineUploadForm.hidden = isExpanded;
+		uploadMediaToggleBtn.setAttribute('aria-expanded', !isExpanded);
+	});
 })();
 
 
