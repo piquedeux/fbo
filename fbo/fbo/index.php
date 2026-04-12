@@ -296,7 +296,7 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 		<div class="fbo-info-col">
 			<main class="archive single" id="idea">
 				<article class="item">
-					<div class="text-post-body">FBO is a Blog template built around one idea: your content belongs to you. You get your own URL, you set a name, you start  blogging. No feed to optimize for, no follower count to grow, no platform making decisions about who sees your media. What you post stays yours. The web as a place to put things, not to perform.</div>
+					<div class="text-post-body">FBO is a Blog template built around one idea: your content belongs to you. You get your own URL, you set a name, you start blogging. No feed to optimize for, no follower count to grow, no platform making decisions about who sees your media. What you post stays yours. The web as a place to put things, not to perform.</div>
 					<div class="stamp">Core ideas</div>
 				</article>
 				<article class="item" id="architecture">
@@ -321,17 +321,13 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 						<details class="fbo-legal-item">
 							<summary>Annoying stuff</summary>
 							<div class="fbo-legal-copy">
-								<p><strong>Imprint (§ 5 TMG)</strong></p>
-								<p>MG<br>Bieberstr 67<br>63039 Offenbach<br>Germany</p>
 
 								<p><strong>Privacy Policy (GDPR)</strong></p>
-								<p><strong>1. Controller</strong><br>MG, Bieberstr 67, 63039 Offenbach, Germany.</p>
-								<p><strong>2. Hosting and server logs</strong><br>When you access this website, technically required data (for example IP address, date/time, requested page, browser details) may be processed in server log files to ensure secure operation (Art. 6(1)(f) GDPR).</p>
-								<p><strong>3. Contact</strong><br>If you contact us, your transmitted data is processed to handle your request (Art. 6(1)(b) or (f) GDPR).</p>
-								<p><strong>4. Storage period</strong><br>Personal data is stored only as long as required for the stated purposes or legal retention duties.</p>
-								<p><strong>5. Your rights</strong><br>You have rights of access, rectification, deletion, restriction, data portability, and objection where applicable, plus the right to lodge a complaint with a supervisory authority.</p>
-								<p><strong>6. Cookies</strong><br>This website currently does not use non-essential tracking or marketing cookies. If this changes, a consent banner will be shown before such cookies are set.</p>
-								<p><strong>Cookie note</strong><br>No non-essential tracking cookies are active right now, so no cookie banner is currently displayed.</p>
+								
+								<p><strong>1. Hosting and server logs</strong><br>When you access this website, technically required data (for example IP address, date/time, requested page, browser details) may be processed in server log files to ensure secure operation (Art. 6(1)(f) GDPR).</p>
+								<p><strong>2. Contact</strong><br>If you contact us, your transmitted data is processed to handle your request (Art. 6(1)(b) or (f) GDPR).</p>
+								<p><strong>3. Your rights</strong><br>You have rights of access, rectification, deletion, restriction, data portability, and objection where applicable.</p>
+								<p><strong>4. Cookies</strong><br>No tracking cookies are active right now, so no cookie banner is currently displayed.</p>
 							</div>
 						</details>
 					</div>
