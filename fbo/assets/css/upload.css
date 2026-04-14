@@ -240,19 +240,19 @@
 }
 
 .ui-btn-record-live {
-    border-color: #b91c1c;
-    background: #b91c1c;
+    border-color: #C91E1E;
+    background: #C91E1E;
     color: #ffffff;
 }
 
 .ui-btn-record-stop {
-    border-color: #b91c1c;
-    color: #b91c1c;
+    border-color: #C91E1E;
+    color: #C91E1E;
 }
 
 .ui-btn-record-stop:hover,
 .ui-btn-record-stop.active {
-    background: #b91c1c;
+    background: #C91E1E;
     color: #ffffff;
 }
 
@@ -277,7 +277,7 @@
 
 .item.marked-delete {
     opacity: 0.45;
-    outline: 2px solid #b91c1c;
+    outline: 2px solid #C91E1E;
 }
 
 .instant-capture-overlay {

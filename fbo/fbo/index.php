@@ -66,6 +66,18 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 		}
 
 
+		.project-title {
+			font-size: clamp(16px, 2.6vw, 18px);
+			font-weight: 500;
+			min-width: 0;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+			text-decoration: none;
+			color: inherit;
+		}
+
+
 		.fbo-index-col {
 			border-right: 2px solid var(--line);
 			padding: 14px 12px;
@@ -86,24 +98,6 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 			margin: 0;
 			padding: 0;
 			border: none;
-		}
-
-
-		@media (max-width: 700px) {
-			.fbo-page-wrap {
-				grid-template-columns: 1fr;
-				height: auto;
-			}
-
-			.fbo-index-col {
-				border-right: none;
-				border-bottom: 2px solid var(--line);
-				overflow-y: visible;
-			}
-
-			.fbo-info-col {
-				overflow-y: visible;
-			}
 		}
 
 
@@ -208,7 +202,6 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 
 		details.fbo-legal-item summary {
 			cursor: pointer;
-			font-weight: 700;
 			text-decoration: underline;
 			list-style: none;
 		}
@@ -230,6 +223,24 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 			line-height: 1.45;
 			color: var(--fg);
 		}
+
+				@media (max-width: 700px) {
+			.fbo-page-wrap {
+				grid-template-columns: 1fr;
+				height: auto;
+			}
+
+			.fbo-index-col {
+				border-right: none;
+				border-bottom: 2px solid var(--line);
+				overflow-y: visible;
+			}
+
+			.fbo-info-col {
+				overflow-y: visible;
+			}
+		}
+		
 	</style>
 </head>
 
@@ -240,7 +251,7 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 
 	<header class="hero" id="fboHeader">
 		<div class="hero-head">
-			<a href="#" onclick="history.back(); return false;" class="logo logo-link">FBO Project</a>
+			<a href="#" onclick="history.back(); return false;" class="project-title"><span class="fbo-highlighted"><span class="fbo-highlighted-ghost" aria-hidden="true">FBO</span><span class="fbo-highlighted-text" aria-hidden="true"><span>F</span><span>B</span><span>O</span></span><span class="sr-only">FBO</span></span> Project<sup>beta</sup></a>
 			<div class="hero-right">
 				<div class="hero-actions">
 					<a href="<?= htmlspecialchars($createBlogHref, ENT_QUOTES, 'UTF-8') ?>" class="ui-btn">Create blog</a>

@@ -32,6 +32,7 @@
 	margin-top: 0;
 	gap: 12px;
 }
+
 .onboarding-header {
 	font-size: 24px;
 	font-weight: 600;
@@ -43,7 +44,8 @@
 	font-size: 18px;
 	color: var(--muted);
 	margin-top: 0;
-} 
+}
+
 .onboarding-form .hero-actions {
 	margin-top: 2px;
 }
@@ -53,7 +55,7 @@
 }
 
 .onboarding-error {
-	color: #b91c1c;
+	color: rgb(255, 0, 0);
 }
 
 .onboarding-url-preview {
@@ -151,21 +153,24 @@
 }
 
 .auth-error {
-	color: #b91c1c;
+	color: rgb(255, 0, 0);
 }
 
 @media (max-width: 700px) {
-	
+
 	.onboarding-header {
 		font-size: 20px;
 	}
+
 	.onboarding-subtitle {
 		font-size: 16px;
 	}
+
 	.existing-blogs {
 		font-size: 16px;
 	}
+
 	.login-note {
-	font-size: 12px;
+		font-size: 12px;
 	}
 }

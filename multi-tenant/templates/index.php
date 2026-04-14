@@ -83,7 +83,7 @@ $previewUrl = $scheme . '://' . $host . '/blog/' . rawurlencode($previewWord);
 					<div class="logo" id="onboardingTitlePreview">
 						<?= htmlspecialchars(strtoupper($previewWord), ENT_QUOTES, 'UTF-8') ?>
 					</div>
-					<a href="/fbo/fbo" class="fbo fbo-link">FBO</a>
+					<a href="/fbo/fbo" class="fbo fbo-link"><span class="fbo-title-mark-black">FBO</span></a>
 				</div>
 			</div>
 			

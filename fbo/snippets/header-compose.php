@@ -16,6 +16,10 @@
             <input type="checkbox" id="includeExifLocation" name="include_exif_location" value="1">
             <span>Use photos/videos location if available</span>
         </label>
+        <label class="upload-checkbox-row" for="allowShuffleboardMedia">
+            <input type="checkbox" id="allowShuffleboardMedia" name="allow_shuffleboard_media" value="1">
+            <span>Allow uploaded images on FBO Shuffleboard</span>
+        </label>
         <input type="hidden" id="uploadClientEpoch" name="upload_client_epoch" value="">
         <div class="hero-actions hero-actions-primary">
             <button type="submit" name="upload_media" value="1" class="ui-btn ui-btn-strong">Post media</button>

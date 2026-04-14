@@ -28,6 +28,7 @@ const MAX_UPLOAD_FILE_SIZE_BYTES = 104857600;
 const MAX_UPLOAD_FILES_PER_REQUEST = 10;
 const MEDIA_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'mp4', 'mov', 'webm', 'm4v', 'mp3', 'wav', 'flac', 'ogg', 'm4a'];
 const BLOG_WORD_MAX_LENGTH = 24;
+const SHUFFLE_MODE_THRESHOLD = 100;
 
 function blog_root(): string
 {
@@ -816,6 +817,7 @@ function normalize_post_entry(array $item): ?array
 	$timestamp = (int) ($item['timestamp'] ?? 0);
 	$type = trim((string) ($item['type'] ?? 'text'));
 	$pinned = !empty($item['pinned']);
+	$allowShuffleboard = !empty($item['allow_shuffleboard']);
 
 	if ($id === '' || $timestamp <= 0 || !in_array($type, ['text', 'image', 'video', 'audio'], true)) {
 		return null;
@@ -831,6 +833,7 @@ function normalize_post_entry(array $item): ?array
 			'id' => $id,
 			'type' => 'text',
 			'text' => mb_substr($text, 0, MAX_TEXT_POST_LENGTH),
+			'allow_shuffleboard' => false,
 			'pinned' => $pinned,
 			'timestamp' => $timestamp,
 		];
@@ -850,6 +853,7 @@ function normalize_post_entry(array $item): ?array
 		'id' => $id,
 		'type' => $type,
 		'path' => $path,
+		'allow_shuffleboard' => $type === 'image' ? $allowShuffleboard : false,
 		'pinned' => $pinned,
 		'timestamp' => $timestamp,
 	];
@@ -991,6 +995,18 @@ function pop_otp_display(): string
 	return $otp;
 }
 
+function set_shuffle_activation_celebration(): void
+{
+	$_SESSION[SHUFFLE_CELEBRATION_SESSION_KEY] = '1';
+}
+
+function pop_shuffle_activation_celebration(): bool
+{
+	$active = !empty($_SESSION[SHUFFLE_CELEBRATION_SESSION_KEY]);
+	unset($_SESSION[SHUFFLE_CELEBRATION_SESSION_KEY]);
+	return $active;
+}
+
 function pinned_media_summary(array $posts): string
 {
 	$pinnedTotal = 0;
@@ -1038,6 +1054,7 @@ define('ADMIN_SESSION_KEY', 'fbo_admin_auth' . $_sk);
 define('FLASH_MESSAGE_SESSION_KEY', 'fbo_flash' . $_sk);
 define('OTP_DISPLAY_SESSION_KEY', 'fbo_otp_once' . $_sk);
 define('OTP_RESET_SESSION_KEY', 'fbo_otp_reset' . $_sk);
+define('SHUFFLE_CELEBRATION_SESSION_KEY', 'fbo_shuffle_celebration' . $_sk);
 define('LAST_BLOG_SESSION_KEY', 'fbo_last_blog_word');
 unset($_blogRaw, $_tmp, $_sk);
 
@@ -1045,6 +1062,7 @@ $isOtpReset = !empty($_SESSION[OTP_RESET_SESSION_KEY]);
 $onboardingError = '';
 $flashMessage = pop_flash_message();
 $otpDisplay = pop_otp_display();
+$shuffleCelebrationActive = pop_shuffle_activation_celebration();
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['generate_otp'])) {
 	$_genSettings = load_settings();
@@ -1251,6 +1269,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['create_tex
 	}
 
 	$posts = load_posts();
+	$previousCount = count($posts);
 	array_unshift($posts, [
 		'id' => 'post_' . time() . '_' . bin2hex(random_bytes(3)),
 		'type' => 'text',
@@ -1259,6 +1278,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['create_tex
 		'timestamp' => time(),
 	]);
 	save_posts($posts);
+	$newCount = $previousCount + 1;
+	if ($previousCount < SHUFFLE_MODE_THRESHOLD && $newCount >= SHUFFLE_MODE_THRESHOLD) {
+		set_shuffle_activation_celebration();
+	}
 	set_flash_message('Post created.');
 	header('Location: ?' . $blogQ . 'compose=1');
 	exit;
@@ -1269,6 +1292,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 	$saved = 0;
 	$failed = 0;
 	$newPosts = [];
+	$allowShuffleboard = (string) ($_POST['allow_shuffleboard_media'] ?? '') === '1';
 	$attachExifLocation = (string) ($_POST['include_exif_location'] ?? '') === '1';
 	$instantLocationCoords = trim((string) ($_POST['instant_location_coords'] ?? ''));
 	$instantLocationLabel = trim((string) ($_POST['instant_location_label'] ?? ''));
@@ -1368,6 +1392,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 				'id' => 'media_' . $clientUploadTimestamp . '_' . bin2hex(random_bytes(3)),
 				'type' => $type,
 				'path' => 'media/' . $targetName,
+				'allow_shuffleboard' => $allowShuffleboard && $type === 'image',
 				'pinned' => false,
 				'timestamp' => extract_media_capture_timestamp($targetPath, $type) ?? $clientUploadTimestamp,
 			];
@@ -1391,7 +1416,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 
 	if ($saved > 0) {
 		$posts = load_posts();
+		$previousCount = count($posts);
 		save_posts(array_merge($newPosts, $posts));
+		$newCount = $previousCount + count($newPosts);
+		if ($previousCount < SHUFFLE_MODE_THRESHOLD && $newCount >= SHUFFLE_MODE_THRESHOLD) {
+			set_shuffle_activation_celebration();
+		}
 	}
 
 	$message = 'Uploaded: ' . $saved;
@@ -1557,6 +1587,68 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['unpin_post
 	exit;
 }
 
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['enable_shuffleboard_post']) && $adminAuthed) {
+	$postId = trim((string) ($_POST['post_id'] ?? ''));
+	$posts = load_posts();
+	$updated = false;
+	$unsupportedType = false;
+	foreach ($posts as &$post) {
+		if ((string) ($post['id'] ?? '') !== $postId) {
+			continue;
+		}
+		if ((string) ($post['type'] ?? '') !== 'image') {
+			$unsupportedType = true;
+			break;
+		}
+		$post['allow_shuffleboard'] = true;
+		$updated = true;
+		break;
+	}
+	unset($post);
+	if ($unsupportedType) {
+		set_flash_message('Only image posts can be added to FBO Shuffleboard.');
+		header('Location: ?' . $blogQ . 'compose=1');
+		exit;
+	}
+	if ($updated) {
+		save_posts($posts);
+		set_flash_message('Post added to FBO Shuffleboard.');
+	}
+	header('Location: ?' . $blogQ . 'compose=1');
+	exit;
+}
+
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['disable_shuffleboard_post']) && $adminAuthed) {
+	$postId = trim((string) ($_POST['post_id'] ?? ''));
+	$posts = load_posts();
+	$updated = false;
+	$unsupportedType = false;
+	foreach ($posts as &$post) {
+		if ((string) ($post['id'] ?? '') !== $postId) {
+			continue;
+		}
+		if ((string) ($post['type'] ?? '') !== 'image') {
+			$unsupportedType = true;
+			break;
+		}
+		$post['allow_shuffleboard'] = false;
+		$updated = true;
+		break;
+	}
+	unset($post);
+	if ($unsupportedType) {
+		set_flash_message('Only image posts can be managed on FBO Shuffleboard.');
+		header('Location: ?' . $blogQ . 'compose=1');
+		exit;
+	}
+	if ($updated) {
+		save_posts($posts);
+		set_flash_message('Post removed from FBO Shuffleboard.');
+	}
+	header('Location: ?' . $blogQ . 'compose=1');
+	exit;
+}
+
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && isset($_GET['download_backup']) && $adminAuthed) {
 	if (!class_exists('ZipArchive')) {
 		http_response_code(500);
@@ -1632,6 +1724,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && isset($_GET['download_bac
 }
 
 $posts = load_posts();
+$canonicalUrl = blog_self_url();
+$socialPreviewImageUrl = rtrim($canonicalUrl, '/') . '/assets/icon/heart-icon.png';
 $allPostsCount = count($posts);
 $singlePostMode = false;
 if ($requestedPostId !== '' && !$composeMode) {
@@ -1648,7 +1742,7 @@ if ($requestedPostId !== '' && !$composeMode) {
 	}
 }
 
-$shuffleThreshold = 100;
+$shuffleThreshold = SHUFFLE_MODE_THRESHOLD;
 $shuffleRemaining = max(0, $shuffleThreshold - $allPostsCount);
 $shuffleEligible = !$composeMode && !$singlePostMode && $allPostsCount >= $shuffleThreshold;
 $shuffleSeed = $shuffleSeedParam > 0 ? $shuffleSeedParam : random_int(100000, 999999999);
@@ -1720,6 +1814,15 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<meta name="description" content="A blogging tool for people tired of platforms. Open source. No ads. No app. No ai.">
 	<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+	<meta property="og:type" content="website">
+	<meta property="og:title" content="<?= htmlspecialchars($siteNameDisplay, ENT_QUOTES, 'UTF-8') ?>">
+	<meta property="og:description" content="A blogging tool for people tired of platforms. Open source. No ads. No app. No ai.">
+	<meta property="og:url" content="<?= htmlspecialchars($canonicalUrl, ENT_QUOTES, 'UTF-8') ?>">
+	<meta property="og:image" content="<?= htmlspecialchars($socialPreviewImageUrl, ENT_QUOTES, 'UTF-8') ?>">
+	<meta name="twitter:card" content="summary">
+	<meta name="twitter:image" content="<?= htmlspecialchars($socialPreviewImageUrl, ENT_QUOTES, 'UTF-8') ?>">
+	<meta name="twitter:title" content="<?= htmlspecialchars($siteNameDisplay, ENT_QUOTES, 'UTF-8') ?>">
+	<meta name="twitter:description" content="A blogging tool for people tired of platforms. Open source. No ads. No app. No ai.">
 	<link rel="icon" type="image/png" href="<?= local_asset_url('assets/icon/icon.png') ?>">
 	<link rel="apple-touch-icon" href="<?= local_asset_url('assets/icon/icon.png') ?>">
 	<title><?= htmlspecialchars($siteNameDisplay, ENT_QUOTES, 'UTF-8') ?></title>
@@ -1732,7 +1835,7 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 </head>
 
 <body class="<?= $showIntroAnimation ? 'intro-loading' : '' ?>" data-max-text-post-length="<?= MAX_TEXT_POST_LENGTH ?>"
-	data-compose-mode="<?= $composeMode ? '1' : '0' ?>">
+	data-compose-mode="<?= $composeMode ? '1' : '0' ?>" data-shuffle-celebration="<?= $shuffleCelebrationActive ? '1' : '0' ?>">
 	<div class="intro-overlay" id="introOverlay" aria-hidden="true">
 		<div class="intro-fbo" id="introFboText">F</div>
 	</div>
@@ -1750,10 +1853,6 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 						class="ui-btn <?= $view === 'grid' ? 'active' : '' ?>" id="gridViewBtn">grid</a>
 					<a href="?<?= $blogQ ?>view=single<?= $stateQuery ?><?= $shuffleQuery ?>"
 						class="ui-btn <?= $view === 'single' ? 'active' : '' ?>" id="listViewBtn">list</a>
-					<?php if ($shuffleEligible): ?>
-						<a href="?<?= $blogQ ?>view=<?= rawurlencode($view) ?>&page=1<?= $shuffleToggleQuery ?>"
-							class="ui-btn <?= $shuffleActive ? 'active' : '' ?>" id="shuffleModeBtn">shuffle</a>
-					<?php endif; ?>
 				<?php endif; ?>
 			<?php endif; ?>
 			<button type="button" class="ui-btn" id="themeToggle">dark mode</button>
@@ -1763,6 +1862,10 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 				<span class="meta" id="pageInfoLabel" aria-haspopup="listbox"
 					aria-expanded="false"><?= count($postsOnPage) ?> / <?= $totalItems ?> posts (page
 					<?= $page ?>/<?= $totalPages ?>)</span>
+				<?php if ($shuffleEligible): ?>
+					<a href="?<?= $blogQ ?>view=<?= rawurlencode($view) ?>&page=1<?= $shuffleToggleQuery ?>"
+						class="ui-btn <?= $shuffleActive ? 'active' : '' ?>" id="shuffleModeBtn">shuffle</a>
+				<?php endif; ?>
 				<select id="pageJumpSelect" class="page-jump" aria-label="Jump to page">
 					<?php for ($p = 1; $p <= $totalPages; $p++): ?>
 						<option value="<?= $p ?>" <?= $p === $page ? 'selected' : '' ?>>page <?= $p ?></option>
@@ -1784,6 +1887,7 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 			<?php foreach ($postsOnPage as $post): ?>
 				<?php $isPinned = !empty($post['pinned']); ?>
 				<?php $postType = (string) ($post['type'] ?? 'text'); ?>
+				<?php $shuffleAllowed = ($postType === 'image') && !empty($post['allow_shuffleboard']); ?>
 				<?php $postMediaPath = in_array($postType, ['image', 'video', 'audio'], true) ? asset_url((string) ($post['path'] ?? '')) : ''; ?>
 				<?php $postLocationCoords = trim((string) ($post['location_coords'] ?? '')); ?>
 				<?php $postLocationLabel = trim((string) ($post['location_label'] ?? '')); ?>
@@ -1798,12 +1902,14 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 					data-post-type="<?= htmlspecialchars($postType, ENT_QUOTES, 'UTF-8') ?>"
 					data-media-path="<?= htmlspecialchars($postMediaPath, ENT_QUOTES, 'UTF-8') ?>">
 					<?php if ($adminAuthed && $composeMode): ?>
+						<div class="post-admin-actions">
 						<form method="post" class="pin-form">
 							<input type="hidden" name="post_id"
 								value="<?= htmlspecialchars((string) $post['id'], ENT_QUOTES, 'UTF-8') ?>">
 							<button type="submit" name="<?= $isPinned ? 'unpin_post' : 'pin_post' ?>" value="1"
 								class="ui-btn delete-btn pin-btn"><?= $isPinned ? 'Unpin' : 'Pin' ?></button>
 						</form>
+						</div>
 						<button type="button" class="ui-btn delete-btn mark-delete-btn"
 							data-post-id="<?= htmlspecialchars((string) $post['id'], ENT_QUOTES, 'UTF-8') ?>">Delete</button>
 					<?php endif; ?>
@@ -1862,6 +1968,19 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 							</button>
 						<?php endif; ?>
 					</div>
+					<?php if ($adminAuthed && $composeMode && $postType === 'image'): ?>
+						<form method="post" class="shuffleboard-toggle-form">
+							<input type="hidden" name="post_id"
+								value="<?= htmlspecialchars((string) $post['id'], ENT_QUOTES, 'UTF-8') ?>">
+							<button type="submit" name="<?= $shuffleAllowed ? 'disable_shuffleboard_post' : 'enable_shuffleboard_post' ?>"
+								value="1"
+								class="ui-btn shuffleboard-btn<?= $shuffleAllowed ? ' is-active' : '' ?>"
+								title="<?= $shuffleAllowed ? 'Remove from FBO Shuffleboard' : 'Add to FBO Shuffleboard' ?>"
+								aria-label="<?= $shuffleAllowed ? 'Remove from FBO Shuffleboard' : 'Add to FBO Shuffleboard' ?>">
+								<span class="shuffleboard-btn-label"><?= $shuffleAllowed ? 'hide from shuffleboard' : 'show on shuffleboard' ?></span>
+							</button>
+						</form>
+					<?php endif; ?>
 				</article>
 			<?php endforeach; ?>
 		</main>
@@ -1869,9 +1988,7 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 
 	<?php if (!$composeMode && !$singlePostMode): ?>
 		<div class="shuffle-hint-row">
-			<?php if ($shuffleEligible): ?>
-				<span class="meta">Shuffle mode is available<?= $shuffleActive ? ' (active).' : '.' ?></span>
-			<?php else: ?>
+			<?php if (!$shuffleEligible): ?>
 				<span class="meta">Shuffle mode unlocks in <?= $shuffleRemaining ?> more
 					post<?= $shuffleRemaining === 1 ? '' : 's' ?>.</span>
 			<?php endif; ?>

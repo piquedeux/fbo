@@ -60,24 +60,24 @@
 }
 
 .danger-btn {
-	border-color: #b91c1c;
-	background: #b91c1c;
+	border-color: #C91E1E;
+	background: #C91E1E;
 	color: #ffffff;
 }
 
 .danger-btn:hover,
 .danger-btn.active {
-	border-color: #991b1b;
-	background: #991b1b;
+	border-color: #C91E1E;
+	background: #C91E1E;
 	color: #ffffff;
 }
 
 .danger-note {
-	color: #b91c1c;
+	color: rgb(255, 0, 0);
 }
 
 .notice-warn {
-	color: #b45309;
+	color: rgb(255, 0, 0);
 }
 
 .delete-btn {
@@ -90,14 +90,52 @@
 	line-height: 1.1;
 }
 
+.post-admin-actions {
+	position: static;
+}
+
 .pin-btn {
 	left: 6px;
 	right: auto;
 }
 
+.shuffleboard-toggle-form {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	z-index: 6;
+	margin: 0;
+	transform: translate(-50%, -50%);
+}
+
+.shuffleboard-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 5px 10px;
+	font-size: 11px;
+	line-height: 1.15;
+	color: var(--fg);
+	background: var(--bg);
+	border: 2px solid var(--line);
+	white-space: normal;
+	word-break: break-word;
+	text-align: center;
+	max-width: min(190px, calc(100% - 16px));
+}
+
+.shuffleboard-btn.is-active {
+	background: var(--fg);
+	color: var(--bg);
+}
+
+.shuffleboard-btn-label {
+	text-transform: lowercase;
+}
+
 .item.marked-delete {
 	opacity: 0.45;
-	outline: 2px solid #b91c1c;
+	outline: 2px solid #C91E1E;
 }
 
 .pending-delete-actions {
@@ -115,8 +153,34 @@
 
 @media (max-width: 700px) {
 	.pin-form {
-		left: 0;
-		right: 0;
+		position: static;
+	}
+
+	.post-admin-actions {
+		position: absolute;
+		top: 6px;
+		left: 6px;
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		z-index: 4;
+	}
+
+	.shuffleboard-btn {
+		position: static;
+		padding: 3px 6px;
+		font-size: 9px;
+		line-height: 1.05;
+		max-width: calc(100% - 12px);
+	}
+
+	.shuffleboard-btn-label {
+		display: block;
+		inline-size: 12ch;
+		margin: 0 auto;
+		line-height: 1.1;
+		white-space: normal;
+		word-break: normal;
 	}
 
 	.upload-auth-input {
@@ -135,8 +199,9 @@
 	}
 
 	.pin-btn {
-		top: 34px;
-		right: 6px;
+		position: static;
+		top: auto;
+		right: auto;
 		left: auto;
 		transform: none;
 	}
