@@ -1,0 +1,30 @@
+{
+  "name": "FBO - Multi-Tenant Blog Platform",
+  "version": "2.6.1",
+  "description": "A multi-tenant PHP-based blog and portfolio platform with admin panel, audio features, and a shuffleboard.",
+  "author": "Moritz Gauss",
+  "license": "MIT",
+  "type": "web-application",
+  "entry_point": "index.php",
+  "php_version": ">=7.4",
+  "features": [
+    "multi-tenant architecture",
+    "blog management",
+    "portfolio functionality",
+    "admin control panel",
+    "audio player",
+    "shuffleboard game",
+    "media management",
+    "SMTP configuration",
+    "responsive UI"
+  ],
+  "dependencies": {
+    "php": ">=7.4"
+  },
+  "directories": {
+    "backend": "Backend API and data files",
+    "assets": "CSS, JavaScript, and media assets",
+    "templates": "Reusable PHP templates",
+    "snippets": "PHP header and component snippets"
+  }
+}

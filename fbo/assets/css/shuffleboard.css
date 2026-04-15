@@ -23,6 +23,15 @@
     gap: 6px;
 }
 
+.shuffleboard-meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: 100%;
+    margin: 0 0 10px;
+}
+
 .shuffleboard-meta {
     font-size: 12px;
     color: var(--muted);
@@ -45,12 +54,12 @@
 
 .shuffle-cell {
     min-width: 0;
-    aspect-ratio: 3 / 4.42;
+    aspect-ratio: 3 / 4;
 }
 
 .shuffle-hole {
     border: 1px solid var(--line);
-    background: #FF0900;
+    background: #fff;
     width: 100%;
     height: 100%;
 }
@@ -62,6 +71,33 @@
     height: 100%;
     opacity: 0.42;
 }
+
+.shuffle-mask-cell {
+    display: block;
+    opacity: 1;
+    will-change: opacity;
+    text-decoration: none;
+    background-color: #140000;
+    background-image: linear-gradient(0deg, #ff1a1a 0%, #ff1a1a 100%), var(--mask-image);
+    background-repeat: no-repeat;
+    background-blend-mode: color, normal;
+    background-size: calc(var(--grid-cols) * 100%) calc(var(--grid-rows) * 100%);
+    background-position: var(--tile-x, 0%) var(--tile-y, 0%);
+    filter: saturate(1.1) brightness(0.9) contrast(1.1);
+    transition: filter 160ms ease, opacity 160ms ease;
+}
+
+.shuffleboard-grid.is-mask-switching .shuffle-mask-cell {
+    opacity: 0.74;
+}
+
+.shuffle-mask-cell:hover,
+.shuffle-mask-cell:focus-visible {
+    filter: saturate(1.1) brightness(0.9) contrast(1.1);
+    opacity: 0.88;
+    outline: none;
+}
+
 
 .shuffle-item {
     display: grid;
@@ -122,6 +158,17 @@
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
+}
+
+.shuffleboard-headline .ui-btn {
+    padding: 6px 10px;
+    font-size: 13px;
+    line-height: 1.2;
+}
+
+.shuffleboard-headline button.ui-btn {
+    appearance: none;
+    -webkit-appearance: none;
 }
 
 .shuffle-icon-btn {
@@ -220,7 +267,6 @@
     display: block;
     font-size: 14px;
     font-weight: 700;
-    letter-spacing: 0.02em;
 }
 
 .shuffle-search-hit-url {
@@ -256,7 +302,7 @@
     }
 
     .shuffle-cell {
-        aspect-ratio: 3 / 4.42;
+        aspect-ratio: 3 / 4;
     }
 
     .shuffleboard-grid .item,
@@ -286,8 +332,14 @@
         margin-left: auto;
     }
 
-    .shuffleboard-headline-left .ui-btn,
-    .shuffleboard-headline-right .ui-btn {
-        min-width: 110px;
+    .shuffleboard-grid .media-fbo-indicator {
+        left: 3px;
+        bottom: 3px;
+        padding: 1px 4px;
+        border-width: 1px;
+        font-size: 7px;
+        letter-spacing: 0.04em;
+        line-height: 1;
     }
+
 }

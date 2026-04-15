@@ -347,7 +347,7 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 
 				<article class="item" id="source">
 					<div class="text-post-body">Source code is available on <a
-							href="https://github.com/piquedeux/fbo-blog-template" target="_blank"
+							href="https://github.com/piquedeux/fbo" target="_blank"
 							rel="noopener noreferrer">GitHub</a>.</div>
 					<div class="stamp">For nerds</div>
 				</article>

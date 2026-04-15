@@ -230,6 +230,7 @@ foreach (array_keys($blogEntries) as $blogWord) {
 }
 
 $createdBlogsCount = count($blogEntries);
+$optedInPostsCount = count($cards);
 
 $boardShuffleSeed = (int) ($_GET['shuffle_seed'] ?? 0);
 if ($boardShuffleSeed > 0) {
@@ -268,6 +269,49 @@ $heartMask = [
 	'11111011111',
 	'11111111111',
 ];
+
+$heartRowCount = count($heartMask);
+$heartColCount = isset($heartMask[0]) ? strlen((string) $heartMask[0]) : 0;
+
+$maskCard = null;
+if ($cards !== []) {
+	$maskSeed = $boardShuffleSeed > 0 ? (string) $boardShuffleSeed : (string) random_int(100000, 999999999);
+	$maskHash = hash('sha256', $maskSeed . '|mask-image');
+	$maskIndex = (int) (hexdec(substr($maskHash, 0, 8)) % count($cards));
+	$candidate = $cards[$maskIndex] ?? null;
+	if (is_array($candidate) && trim((string) ($candidate['media_url'] ?? '')) !== '' && trim((string) ($candidate['post_url'] ?? '')) !== '') {
+		$maskCard = $candidate;
+	}
+}
+
+$maskImageCss = 'none';
+if (is_array($maskCard)) {
+	$maskImageUrl = (string) ($maskCard['media_url'] ?? '');
+	if ($maskImageUrl !== '') {
+		$encodedMaskUrl = json_encode($maskImageUrl, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+		if (is_string($encodedMaskUrl) && $encodedMaskUrl !== '') {
+			$maskImageCss = 'url(' . $encodedMaskUrl . ')';
+		}
+	}
+}
+
+$maskCardsData = [];
+foreach ($cards as $card) {
+	if (!is_array($card)) {
+		continue;
+	}
+	$mediaUrl = trim((string) ($card['media_url'] ?? ''));
+	$postUrl = trim((string) ($card['post_url'] ?? ''));
+	if ($mediaUrl === '' || $postUrl === '') {
+		continue;
+	}
+	$key = $mediaUrl . '|' . $postUrl;
+	$maskCardsData[$key] = [
+		'media_url' => $mediaUrl,
+		'post_url' => $postUrl,
+	];
+}
+$maskCardsData = array_values($maskCardsData);
 
 $searchBlogs = [];
 if (is_array($blogs)) {
@@ -325,21 +369,47 @@ if (is_array($blogs)) {
 			</div>
 			<div class="shuffleboard-headline-right">
 				<a href="<?= htmlspecialchars($shuffleRefreshUrl, ENT_QUOTES, 'UTF-8') ?>" class="ui-btn">shuffle</a>
-				<div class="shuffleboard-meta"><?= $createdBlogsCount ?> created blogs</div>
 			</div>
 		</div>
+		<div class="shuffleboard-meta-row">
+			<div class="shuffleboard-meta"><?= $optedInPostsCount ?> posts in shuffle</div>
+			<div class="shuffleboard-meta"><?= $createdBlogsCount ?> created blogs</div>
+		</div>
 
-		<main class="shuffleboard-grid">
+		<main class="shuffleboard-grid" style="--grid-cols: <?= $heartColCount ?>; --grid-rows: <?= $heartRowCount ?>; --mask-image: <?= htmlspecialchars($maskImageCss, ENT_QUOTES, 'UTF-8') ?>;">
 			<?php $cursor = 0; ?>
-			<?php foreach ($heartMask as $rowMask): ?>
-				<?php for ($col = 0; $col < 11; $col++): ?>
+			<?php foreach ($heartMask as $rowIndex => $rowMask): ?>
+				<?php for ($col = 0; $col < $heartColCount; $col++): ?>
+					<?php
+					$tileX = $heartColCount > 1 ? ($col / ($heartColCount - 1)) * 100 : 0;
+					$tileY = $heartRowCount > 1 ? ($rowIndex / ($heartRowCount - 1)) * 100 : 0;
+					$tileStyle = '--tile-x: ' . number_format($tileX, 4, '.', '') . '%; --tile-y: ' . number_format($tileY, 4, '.', '') . '%;';
+					?>
 					<?php if (($rowMask[$col] ?? '0') !== '1'): ?>
-						<div class="shuffle-cell shuffle-hole" aria-hidden="true"></div>
+						<?php if (is_array($maskCard)): ?>
+							<a
+								class="shuffle-cell shuffle-hole shuffle-mask-cell"
+								href="<?= htmlspecialchars((string) ($maskCard['post_url'] ?? '/'), ENT_QUOTES, 'UTF-8') ?>"
+								style="<?= htmlspecialchars($tileStyle, ENT_QUOTES, 'UTF-8') ?>"
+								aria-label="Open masked image post"
+							></a>
+						<?php else: ?>
+							<div class="shuffle-cell shuffle-hole" aria-hidden="true"></div>
+						<?php endif; ?>
 						<?php continue; ?>
 					<?php endif; ?>
 
 					<?php if (!isset($cards[$cursor])): ?>
-						<div class="shuffle-cell shuffle-empty" aria-hidden="true"></div>
+						<?php if (is_array($maskCard)): ?>
+							<a
+								class="shuffle-cell shuffle-empty shuffle-mask-cell"
+								href="<?= htmlspecialchars((string) ($maskCard['post_url'] ?? '/'), ENT_QUOTES, 'UTF-8') ?>"
+								style="<?= htmlspecialchars($tileStyle, ENT_QUOTES, 'UTF-8') ?>"
+								aria-label="Open masked image post"
+							></a>
+						<?php else: ?>
+							<div class="shuffle-cell shuffle-empty" aria-hidden="true"></div>
+						<?php endif; ?>
 						<?php continue; ?>
 					<?php endif; ?>
 
@@ -377,6 +447,7 @@ if (is_array($blogs)) {
 	</div>
 
 	<script id="shuffleBlogsData" type="application/json"><?= json_encode($searchBlogs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
+	<script id="shuffleMaskCardsData" type="application/json"><?= json_encode($maskCardsData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
 	<script src="<?= local_asset_url('assets/js/script.js') ?>" defer></script>
 	<script src="<?= local_asset_url('assets/js/shuffleboard.js') ?>" defer></script>
 </body>

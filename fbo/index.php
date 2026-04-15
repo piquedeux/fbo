@@ -1153,7 +1153,7 @@ $passwordHash = load_password_hash();
 
 $view = isset($_GET['view']) && in_array($_GET['view'], ['grid', 'single'], true)
 	? $_GET['view']
-	: (isset($_SERVER['HTTP_USER_AGENT']) && preg_match('/Mobile|Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i', $_SERVER['HTTP_USER_AGENT']) ? 'single' : 'grid');
+	: 'grid';
 $editMode = isset($_GET['edit']) && $_GET['edit'] === '1';
 $composeMode = isset($_GET['compose']) && $_GET['compose'] === '1';
 $shuffleRequested = isset($_GET['shuffle']) && (string) $_GET['shuffle'] === '1';
@@ -1818,13 +1818,14 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 	<meta property="og:title" content="<?= htmlspecialchars($siteNameDisplay, ENT_QUOTES, 'UTF-8') ?>">
 	<meta property="og:description" content="A blogging tool for people tired of platforms. Open source. No ads. No app. No ai.">
 	<meta property="og:url" content="<?= htmlspecialchars($canonicalUrl, ENT_QUOTES, 'UTF-8') ?>">
-	<meta property="og:image" content="<?= htmlspecialchars($socialPreviewImageUrl, ENT_QUOTES, 'UTF-8') ?>">
+	<meta property="og:image" content="<?= local_asset_url('assets/icon/heart-icon.png') ?>">
 	<meta name="twitter:card" content="summary">
-	<meta name="twitter:image" content="<?= htmlspecialchars($socialPreviewImageUrl, ENT_QUOTES, 'UTF-8') ?>">
+	<meta name="twitter:image" content="<?= local_asset_url('assets/icon/heart-icon.png') ?>">
 	<meta name="twitter:title" content="<?= htmlspecialchars($siteNameDisplay, ENT_QUOTES, 'UTF-8') ?>">
 	<meta name="twitter:description" content="A blogging tool for people tired of platforms. Open source. No ads. No app. No ai.">
 	<link rel="icon" type="image/png" href="<?= local_asset_url('assets/icon/icon.png') ?>">
-	<link rel="apple-touch-icon" href="<?= local_asset_url('assets/icon/icon.png') ?>">
+	<link rel="apple-touch-icon" href="<?= local_asset_url('assets/icon/heart-icon.png') ?>">
+	<link rel="manifest" href="<?= local_asset_url('fbo/manifest.json') ?>">
 	<title><?= htmlspecialchars($siteNameDisplay, ENT_QUOTES, 'UTF-8') ?></title>
 	<link rel="stylesheet" href="<?= local_asset_url('assets/css/styles.css') ?>">
 	<link rel="stylesheet" href="<?= local_asset_url('assets/css/upload.css') ?>">
