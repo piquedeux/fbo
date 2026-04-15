@@ -23,7 +23,7 @@ if (is_file($dbFile)) {
 	}
 }
 
-$blogs[] = ['blog_word' => 'moritzgauss', 'created_at' => '2026-01-01 00:00:00', 'custom_url' => 'https://blog.piquedeux.de'];
+$blogs[] = ['blog_word' => 'moritz', 'created_at' => '2026-01-01 00:00:00', 'custom_url' => 'https://blog.piquedeux.de'];
 
 function fbo_format_date(string $date): string
 {
