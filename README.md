@@ -57,5 +57,3 @@ This keeps the platform easy to run while still isolating each blog's data.
 - Clear separation: shared code vs. per-blog data.
 - Practical isolation: each blog can be managed independently.
 - Straightforward operations: simple files for content, predictable paths for media.
-
-In short, FBO is a focused publishing platform, not a theme or template package.
