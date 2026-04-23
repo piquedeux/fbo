@@ -21,6 +21,20 @@ if (!function_exists('str_contains')) {
 	}
 }
 
+if (!function_exists('array_is_list')) {
+	function array_is_list(array $array): bool
+	{
+		$expectedKey = 0;
+		foreach ($array as $key => $_value) {
+			if ($key !== $expectedKey) {
+				return false;
+			}
+			$expectedKey++;
+		}
+		return true;
+	}
+}
+
 session_start();
 
 const MAX_TEXT_POST_LENGTH = 280;

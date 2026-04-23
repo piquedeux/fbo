@@ -1,12 +1,33 @@
 (() => {
   const ROTATE_INTERVAL_MS = 5000;
-  const SWITCH_FADE_OUT_MS = 90;
-  const SWITCH_FADE_TOTAL_MS = 220;
+  const SWITCH_FADE_OUT_MS = 110;
+  const SWITCH_FADE_TOTAL_MS = 240;
   const dataEl = document.getElementById("shuffleMaskCardsData");
   const grid = document.querySelector(".shuffleboard-grid");
   const maskLinks = Array.from(document.querySelectorAll(".shuffle-mask-cell"));
+  const shuffleBtn = document.getElementById("shuffleMaskNow");
 
-  if (!dataEl || !grid || maskLinks.length === 0) return;
+  if (!dataEl || !grid) return;
+
+  const gridCols = Math.max(
+    1,
+    Number.parseInt(grid.getAttribute("data-grid-cols") || "11", 10) || 11,
+  );
+  const gridRows = Math.max(
+    1,
+    Number.parseInt(grid.getAttribute("data-grid-rows") || "9", 10) || 9,
+  );
+  grid.style.setProperty("--grid-cols", String(gridCols));
+  grid.style.setProperty("--grid-rows", String(gridRows));
+
+  maskLinks.forEach((link) => {
+    const col = Number.parseInt(link.getAttribute("data-col") || "0", 10) || 0;
+    const row = Number.parseInt(link.getAttribute("data-row") || "0", 10) || 0;
+    const x = gridCols > 1 ? (col / (gridCols - 1)) * 100 : 0;
+    const y = gridRows > 1 ? (row / (gridRows - 1)) * 100 : 0;
+    link.style.setProperty("--tile-x", `${x.toFixed(3)}%`);
+    link.style.setProperty("--tile-y", `${y.toFixed(3)}%`);
+  });
 
   let cards = [];
   try {
@@ -23,29 +44,66 @@
     return mediaUrl !== "" && postUrl !== "";
   });
 
-  if (cards.length < 2) return;
+  const postItems = Array.from(document.querySelectorAll(".shuffle-item"));
+
+  const shuffleArray = (values) => {
+    const next = values.slice();
+    for (let i = next.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const tmp = next[i];
+      next[i] = next[j];
+      next[j] = tmp;
+    }
+    return next;
+  };
+
+  const renderGridCards = () => {
+    if (!postItems.length || !cards.length) return;
+    const picked = shuffleArray(cards).slice(0, postItems.length);
+    postItems.forEach((item, idx) => {
+      const card = picked[idx];
+      if (!card) return;
+
+      const link = item.querySelector(".shuffle-post-link");
+      const image = item.querySelector("img");
+      const stamp = item.querySelector(".shuffle-blog-stamp");
+
+      if (link) {
+        link.setAttribute("href", card.post_url);
+      }
+      if (image) {
+        image.src = card.media_url;
+        image.alt = card.blog_name || "shuffleboard image";
+      }
+      if (stamp) {
+        stamp.textContent = card.blog_name || "blog";
+      }
+    });
+  };
+
+  if (cards.length === 0) return;
+
+  const hasMaskCells = maskLinks.length > 0;
 
   cards.forEach((card) => {
     const img = new Image();
     img.src = card.media_url;
   });
 
-  let index = 0;
+  let index = Math.floor(Math.random() * cards.length);
   let displayedCard = cards[0];
-  let interactionUntil = 0;
   let switchApplyTimer = null;
   let switchDoneTimer = null;
-  const activeImage = String(
-    getComputedStyle(grid).getPropertyValue("--mask-image") || "",
+  const initialMaskImage = String(
+    grid.getAttribute("data-mask-image") || "",
   ).trim();
-  if (activeImage) {
-    const matchedIndex = cards.findIndex((card) => {
-      const probe = `url(${JSON.stringify(card.media_url)})`;
-      return probe === activeImage;
-    });
-    if (matchedIndex >= 0) {
-      index = matchedIndex;
-    }
+
+  if (initialMaskImage) {
+    grid.style.setProperty("--mask-image", initialMaskImage);
+    const matchedIndex = cards.findIndex(
+      (card) => `url(${JSON.stringify(card.media_url)})` === initialMaskImage,
+    );
+    if (matchedIndex >= 0) index = matchedIndex;
   }
 
   displayedCard = cards[index];
@@ -59,13 +117,15 @@
     displayedCard = card;
   };
 
-  setCard(displayedCard);
+  if (hasMaskCells) {
+    setCard(displayedCard);
+  }
 
-  const switchToIndex = (nextIndex, animate = true) => {
+  const switchToIndex = (nextIndex, animate = true, immediate = false) => {
     index = nextIndex;
     const next = cards[index];
 
-    if (!animate) {
+    if (!animate || immediate) {
       setCard(next);
       return;
     }
@@ -91,22 +151,23 @@
     }, SWITCH_FADE_TOTAL_MS);
   };
 
-  const nextCard = (animate = true) => {
-    const now = Date.now();
-    if (now < interactionUntil) {
-      return;
+  const randomNextIndex = () => {
+    if (cards.length <= 1) return index;
+    let nextIndex = index;
+    while (nextIndex === index) {
+      nextIndex = Math.floor(Math.random() * cards.length);
     }
-    const nextIndex = (index + 1) % cards.length;
-    switchToIndex(nextIndex, animate);
+    return nextIndex;
   };
 
-  let intervalId = window.setInterval(() => {
-    nextCard(true);
-  }, ROTATE_INTERVAL_MS);
+  const nextCard = (animate = true, immediate = false) => {
+    if (!hasMaskCells) return;
+    const nextIndex = randomNextIndex();
+    switchToIndex(nextIndex, animate, immediate);
+  };
 
-  const bumpNow = () => {
-    interactionUntil = Date.now() + 1200;
-    nextCard(true);
+  let intervalId = null;
+  const restartInterval = () => {
     if (intervalId !== null) {
       window.clearInterval(intervalId);
     }
@@ -115,32 +176,24 @@
     }, ROTATE_INTERVAL_MS);
   };
 
-  const markInteraction = () => {
-    interactionUntil = Date.now() + 1200;
-  };
-
-  maskLinks.forEach((link) => {
-    link.addEventListener("click", (event) => {
-      if (!displayedCard || !displayedCard.post_url) return;
-      event.preventDefault();
-      window.location.href = displayedCard.post_url;
+  if (shuffleBtn) {
+    shuffleBtn.addEventListener("click", () => {
+      renderGridCards();
+      nextCard(true, true);
+      restartInterval();
     });
-  });
+  }
 
-  grid.addEventListener("pointerenter", bumpNow);
-  grid.addEventListener("pointerdown", markInteraction, { passive: true });
-  grid.addEventListener(
-    "touchstart",
-    (event) => {
-      markInteraction();
-      const target = event.target;
-      if (target instanceof Element && target.closest(".shuffle-mask-cell")) {
-        return;
-      }
-      bumpNow();
-    },
-    { passive: true },
-  );
+  if (hasMaskCells) {
+    restartInterval();
+    maskLinks.forEach((link) => {
+      link.addEventListener("click", (event) => {
+        if (!displayedCard || !displayedCard.post_url) return;
+        event.preventDefault();
+        window.location.href = displayedCard.post_url;
+      });
+    });
+  }
 })();
 
 (() => {

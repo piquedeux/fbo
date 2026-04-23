@@ -20,4 +20,18 @@ if (!function_exists('str_contains')) {
 		return strpos($haystack, $needle) !== false;
 	}
 }
+
+if (!function_exists('array_is_list')) {
+	function array_is_list(array $array): bool
+	{
+		$expectedKey = 0;
+		foreach ($array as $key => $_value) {
+			if ($key !== $expectedKey) {
+				return false;
+			}
+			$expectedKey++;
+		}
+		return true;
+	}
+}
 require __DIR__ . '/multi-tenant/core/bootstrap.php';

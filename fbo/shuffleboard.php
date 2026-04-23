@@ -1,6 +1,20 @@
 <?php
 declare(strict_types=1);
 
+if (!function_exists('array_is_list')) {
+	function array_is_list(array $array): bool
+	{
+		$expectedKey = 0;
+		foreach ($array as $key => $_value) {
+			if ($key !== $expectedKey) {
+				return false;
+			}
+			$expectedKey++;
+		}
+		return true;
+	}
+}
+
 if (session_status() === PHP_SESSION_NONE) {
 	session_start();
 }
@@ -8,255 +22,107 @@ if (session_status() === PHP_SESSION_NONE) {
 function local_asset_url(string $relativePath): string
 {
 	$cleanPath = ltrim($relativePath, '/');
+
+	if (defined('ASSET_BASE_URL') && is_string(ASSET_BASE_URL) && ASSET_BASE_URL !== '') {
+		$fullPath = __DIR__ . '/' . $cleanPath;
+		$version = is_file($fullPath) ? (string) filemtime($fullPath) : '1';
+		return htmlspecialchars(
+			rtrim((string) ASSET_BASE_URL, '/') . '/' . $cleanPath . '?v=' . rawurlencode($version),
+			ENT_QUOTES,
+			'UTF-8'
+		);
+	}
+
 	$fullPath = __DIR__ . '/' . $cleanPath;
 	$version = is_file($fullPath) ? (string) filemtime($fullPath) : '1';
 	return htmlspecialchars('/fbo/' . $cleanPath . '?v=' . rawurlencode($version), ENT_QUOTES, 'UTF-8');
 }
 
-function normalize_blog_word(string $value): string
+function get_json_data(string $path): array
 {
-	$word = strtolower(trim($value));
-	$word = preg_replace('/[^a-z0-9_-]/', '', $word) ?? '';
-	return mb_substr($word, 0, 24);
-}
-
-function encode_path_segments(string $path): string
-{
-	$segments = array_values(array_filter(explode('/', $path), static function (string $segment): bool {
-		return $segment !== '';
-	}));
-	$encoded = array_map(static function (string $segment): string {
-		return rawurlencode($segment);
-	}, $segments);
-	return implode('/', $encoded);
-}
-
-function read_json_array_file(string $path): array
-{
-	if (!is_file($path)) {
+	if (!is_file($path) || !is_readable($path)) {
 		return [];
 	}
-	$decoded = json_decode((string) file_get_contents($path), true);
+	$decoded = json_decode((string) @file_get_contents($path), true);
 	if (!is_array($decoded)) {
 		return [];
 	}
-	if (isset($decoded['items']) && is_array($decoded['items'])) {
-		return $decoded['items'];
-	}
-	return array_is_list($decoded) ? $decoded : [];
+	return array_is_list($decoded) ? $decoded : (is_array($decoded['items'] ?? null) ? $decoded['items'] : $decoded);
 }
 
-function read_blog_display_name(string $settingsPath, string $fallback): string
+function request_scheme(): string
 {
-	if (!is_file($settingsPath)) {
-		return $fallback;
+	$https = (string) ($_SERVER['HTTPS'] ?? '');
+	if ($https !== '' && strtolower($https) !== 'off') {
+		return 'https';
 	}
-	$decoded = json_decode((string) file_get_contents($settingsPath), true);
-	if (!is_array($decoded)) {
-		return $fallback;
+	$forwardedProto = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+	if ($forwardedProto === 'https') {
+		return 'https';
 	}
-	$siteName = trim((string) ($decoded['site_name'] ?? ''));
-	return $siteName !== '' ? $siteName : $fallback;
+	return ((string) ($_SERVER['SERVER_PORT'] ?? '') === '443') ? 'https' : 'http';
 }
 
-function normalize_shuffle_item(array $item): ?array
-{
-	$id = trim((string) ($item['id'] ?? ''));
-	$type = trim((string) ($item['type'] ?? ''));
-	$timestamp = (int) ($item['timestamp'] ?? 0);
-	$allowed = !empty($item['allow_shuffleboard']);
-
-	if (!$allowed || $id === '' || $timestamp <= 0 || $type !== 'image') {
-		return null;
-	}
-
-	$path = trim((string) ($item['path'] ?? ''));
-	if ($path === '') {
-		return null;
-	}
-
-	return [
-		'id' => $id,
-		'type' => $type,
-		'path' => $path,
-		'timestamp' => $timestamp,
-	];
-}
-
-function build_standalone_media_url(string $path): string
-{
-	if (preg_match('#^https?://#i', $path)) {
-		return $path;
-	}
-	return '/fbo/' . ltrim($path, '/');
-}
-
-function build_multi_tenant_media_url(string $blogWord, string $path): string
-{
-	if (preg_match('#^https?://#i', $path)) {
-		return $path;
-	}
-
-	$cleanPath = ltrim($path, '/');
-	if (str_starts_with($cleanPath, 'media/')) {
-		return '/multi-tenant/blogs/' . rawurlencode($blogWord) . '/' . encode_path_segments($cleanPath);
-	}
-
-	return '/multi-tenant/blogs/' . rawurlencode($blogWord) . '/' . encode_path_segments($cleanPath);
-}
-
-function linkify_text_post_content(string $text): string
-{
-	$escaped = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
-	$linked = preg_replace_callback(
-		'~((?:https?://|www\.)[^\s<]+)~iu',
-		static function (array $matches): string {
-			$display = (string) ($matches[1] ?? '');
-			if ($display === '') {
-				return '';
-			}
-
-			$trimmedDisplay = rtrim($display, '.,!?;:)]}');
-			$suffix = substr($display, strlen($trimmedDisplay));
-			if ($trimmedDisplay === '') {
-				return $display;
-			}
-
-			$hrefRaw = html_entity_decode($trimmedDisplay, ENT_QUOTES, 'UTF-8');
-			if (!preg_match('~^https?://~i', $hrefRaw)) {
-				$hrefRaw = 'https://' . $hrefRaw;
-			}
-
-			$href = htmlspecialchars($hrefRaw, ENT_QUOTES, 'UTF-8');
-			return '<a class="text-link" href="' . $href . '" target="_blank" rel="noopener noreferrer">' . $trimmedDisplay . '</a>' . $suffix;
-		},
-		$escaped
-	);
-
-	if (!is_string($linked)) {
-		return nl2br($escaped);
-	}
-
-	return nl2br($linked);
-}
+$projectRoot = dirname(__DIR__);
+$blogsDir = $projectRoot . '/multi-tenant/blogs';
+$scheme = request_scheme();
+$host = (string) ($_SERVER['HTTP_HOST'] ?? 'example.com');
 
 $cards = [];
-$projectRoot = dirname(__DIR__);
-$standaloneRoot = __DIR__;
-
-$standalonePostsPath = $standaloneRoot . '/backend/posts.json';
-$standaloneSettingsPath = $standaloneRoot . '/backend/settings.json';
-$standaloneName = read_blog_display_name($standaloneSettingsPath, 'fbo');
-foreach (read_json_array_file($standalonePostsPath) as $item) {
-	if (!is_array($item)) {
-		continue;
-	}
-
-	$normalized = normalize_shuffle_item($item);
-	if ($normalized === null) {
-		continue;
-	}
-
-	if (isset($normalized['path'])) {
-		$normalized['media_url'] = build_standalone_media_url((string) $normalized['path']);
-	}
-	$normalized['blog_name'] = $standaloneName;
-	$normalized['post_url'] = '/fbo/?post_id=' . rawurlencode((string) $normalized['id']);
-	$cards[] = $normalized;
-}
-
 $blogs = [];
-$dbFile = $projectRoot . '/multi-tenant/core/db.php';
-if (is_file($dbFile)) {
-	try {
-		require_once $dbFile;
-		if (function_exists('mt_list_blogs')) {
-			$blogs = mt_list_blogs();
-		}
-	} catch (Throwable $e) {
-		$blogs = [];
-	}
-}
 
-$blogEntries = [];
-if (is_array($blogs)) {
-	foreach ($blogs as $row) {
-		if (!is_array($row)) {
-			continue;
-		}
-		$word = normalize_blog_word((string) ($row['blog_word'] ?? ''));
-		if ($word !== '') {
-			$blogEntries[$word] = true;
-		}
-	}
-}
-
-$blogsDir = $projectRoot . '/multi-tenant/blogs';
 if (is_dir($blogsDir)) {
-	$entries = scandir($blogsDir);
-	if (is_array($entries)) {
-		foreach ($entries as $entry) {
-			$word = normalize_blog_word((string) $entry);
-			if ($word !== '') {
-				$blogEntries[$word] = true;
+	$dirs = array_values(array_filter(scandir($blogsDir) ?: [], static function (string $dir): bool {
+		return $dir !== '.' && $dir !== '..';
+	}));
+
+	foreach ($dirs as $word) {
+		$blogPath = $blogsDir . '/' . $word;
+		if (!is_dir($blogPath)) {
+			continue;
+		}
+
+		$posts = get_json_data($blogPath . '/backend/posts.json');
+		$settings = get_json_data($blogPath . '/backend/settings.json');
+		$siteName = trim((string) ($settings['site_name'] ?? $word));
+		$blogUrl = '/blog/' . rawurlencode($word);
+		$fullUrl = $scheme . '://' . $host . $blogUrl;
+
+		$blogs[] = [
+			'word' => strtolower((string) $word),
+			'url' => $blogUrl,
+			'fullUrl' => $fullUrl,
+			'name' => $siteName,
+		];
+
+		foreach ($posts as $item) {
+			if (!is_array($item)) {
+				continue;
 			}
+			if (empty($item['allow_shuffleboard']) || (string) ($item['type'] ?? '') !== 'image') {
+				continue;
+			}
+
+			$path = ltrim((string) ($item['path'] ?? ''), '/');
+			$id = (string) ($item['id'] ?? '');
+			if ($path === '' || $id === '') {
+				continue;
+			}
+
+			$cards[] = [
+				'id' => $id,
+				'timestamp' => (int) ($item['timestamp'] ?? 0),
+				'blog_name' => $siteName,
+				'media_url' => '/multi-tenant/blogs/' . rawurlencode($word) . '/' . $path,
+				'post_url' => '/blog/' . rawurlencode($word) . '?post_id=' . rawurlencode($id),
+			];
 		}
 	}
 }
 
-foreach (array_keys($blogEntries) as $blogWord) {
-	$blogRoot = $blogsDir . '/' . $blogWord;
-	$postsPath = $blogRoot . '/backend/posts.json';
-	$settingsPath = $blogRoot . '/backend/settings.json';
-	$blogName = read_blog_display_name($settingsPath, $blogWord);
-
-	foreach (read_json_array_file($postsPath) as $item) {
-		if (!is_array($item)) {
-			continue;
-		}
-
-		$normalized = normalize_shuffle_item($item);
-		if ($normalized === null) {
-			continue;
-		}
-
-		if (isset($normalized['path'])) {
-			$normalized['media_url'] = build_multi_tenant_media_url($blogWord, (string) $normalized['path']);
-		}
-		$normalized['blog_name'] = $blogName;
-		$normalized['post_url'] = '/blog/' . rawurlencode($blogWord) . '?post_id=' . rawurlencode((string) $normalized['id']);
-		$cards[] = $normalized;
-	}
+if ($cards !== []) {
+	shuffle($cards);
 }
-
-$createdBlogsCount = count($blogEntries);
-$optedInPostsCount = count($cards);
-
-$boardShuffleSeed = (int) ($_GET['shuffle_seed'] ?? 0);
-if ($boardShuffleSeed > 0) {
-	usort($cards, static function (array $a, array $b) use ($boardShuffleSeed): int {
-		$idA = (string) ($a['id'] ?? '');
-		$idB = (string) ($b['id'] ?? '');
-		$hashA = hash('sha256', $boardShuffleSeed . '|' . $idA);
-		$hashB = hash('sha256', $boardShuffleSeed . '|' . $idB);
-		$cmp = $hashA <=> $hashB;
-		if ($cmp !== 0) {
-			return $cmp;
-		}
-		return $idA <=> $idB;
-	});
-} else {
-	usort($cards, static function (array $a, array $b): int {
-		$timeA = (int) ($a['timestamp'] ?? 0);
-		$timeB = (int) ($b['timestamp'] ?? 0);
-		if ($timeA === $timeB) {
-			return strcmp((string) ($b['id'] ?? ''), (string) ($a['id'] ?? ''));
-		}
-		return $timeB <=> $timeA;
-	});
-}
-
-$shuffleRefreshUrl = '/shuffleboard?shuffle_seed=' . rawurlencode((string) random_int(100000, 999999999));
 
 $heartMask = [
 	'11111111111',
@@ -270,185 +136,155 @@ $heartMask = [
 	'11111111111',
 ];
 
-$heartRowCount = count($heartMask);
-$heartColCount = isset($heartMask[0]) ? strlen((string) $heartMask[0]) : 0;
+$rows = count($heartMask);
+$cols = strlen($heartMask[0]);
 
-$maskCard = null;
-if ($cards !== []) {
-	$maskSeed = $boardShuffleSeed > 0 ? (string) $boardShuffleSeed : (string) random_int(100000, 999999999);
-	$maskHash = hash('sha256', $maskSeed . '|mask-image');
-	$maskIndex = (int) (hexdec(substr($maskHash, 0, 8)) % count($cards));
-	$candidate = $cards[$maskIndex] ?? null;
-	if (is_array($candidate) && trim((string) ($candidate['media_url'] ?? '')) !== '' && trim((string) ($candidate['post_url'] ?? '')) !== '') {
-		$maskCard = $candidate;
-	}
-}
-
-$maskImageCss = 'none';
-if (is_array($maskCard)) {
-	$maskImageUrl = (string) ($maskCard['media_url'] ?? '');
-	if ($maskImageUrl !== '') {
-		$encodedMaskUrl = json_encode($maskImageUrl, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-		if (is_string($encodedMaskUrl) && $encodedMaskUrl !== '') {
-			$maskImageCss = 'url(' . $encodedMaskUrl . ')';
+$maskCoordLookup = [];
+for ($rowIndex = 0; $rowIndex < $rows; $rowIndex++) {
+	$rowMask = $heartMask[$rowIndex];
+	for ($colIndex = 0; $colIndex < $cols; $colIndex++) {
+		if (($rowMask[$colIndex] ?? '0') === '0') {
+			$maskCoordLookup[$rowIndex . '-' . $colIndex] = true;
 		}
 	}
 }
 
-$maskCardsData = [];
-foreach ($cards as $card) {
-	if (!is_array($card)) {
-		continue;
-	}
-	$mediaUrl = trim((string) ($card['media_url'] ?? ''));
-	$postUrl = trim((string) ($card['post_url'] ?? ''));
-	if ($mediaUrl === '' || $postUrl === '') {
-		continue;
-	}
-	$key = $mediaUrl . '|' . $postUrl;
-	$maskCardsData[$key] = [
-		'media_url' => $mediaUrl,
-		'post_url' => $postUrl,
-	];
-}
-$maskCardsData = array_values($maskCardsData);
+$initialMaskCard = $cards[0] ?? null;
+$maskImageCss = $initialMaskCard !== null
+	? 'url(' . json_encode($initialMaskCard['media_url'], JSON_UNESCAPED_SLASHES) . ')'
+	: 'none';
 
-$searchBlogs = [];
-if (is_array($blogs)) {
-	foreach ($blogs as $row) {
-		if (!is_array($row)) {
-			continue;
-		}
-		$word = normalize_blog_word((string) ($row['blog_word'] ?? ''));
-		if ($word === '') {
-			continue;
-		}
-		$searchBlogs[] = [
-			'word' => $word,
-			'url' => '/blog/' . rawurlencode($word),
-			'fullUrl' => 'https://' . (string) ($_SERVER['HTTP_HOST'] ?? 'example.com') . '/blog/' . rawurlencode($word),
-		];
-	}
+$createBlogHref = '/';
+$lastBlogWord = strtolower(trim((string) ($_SESSION['fbo_last_blog_word'] ?? '')));
+if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) === 1) {
+	$createBlogHref = '/blog/' . rawurlencode($lastBlogWord);
 }
+
+$gridCards = $cards;
+$gridCardCount = count($gridCards);
+$blogCount = count($blogs);
 ?>
 <!doctype html>
-<html lang="en">
+<html lang="de">
+
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<meta name="description" content="FBO Shuffleboard - image posts by FBO blogs.">
+	<meta name="description" content="FBO Shuffleboard with rotating featured mask and blog search.">
 	<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
 	<link rel="icon" type="image/png" href="<?= local_asset_url('assets/icon/icon.png') ?>">
-	<link rel="apple-touch-icon" href="<?= local_asset_url('assets/icon/icon.png') ?>">
+	<link rel="apple-touch-icon" href="<?= local_asset_url('assets/icon/heart-icon.png') ?>">
 	<title>FBO Shuffleboard</title>
 	<link rel="stylesheet" href="<?= local_asset_url('assets/css/styles.css') ?>">
 	<link rel="stylesheet" href="<?= local_asset_url('assets/css/shuffleboard.css') ?>">
 </head>
-<body class="intro-loading">
-	<div class="intro-overlay" id="introOverlay" aria-hidden="true">
-		<div class="intro-fbo" id="introFboText">F</div>
-	</div>
 
+<body class="shuffleboard-page">
 	<header class="hero">
 		<div class="hero-head">
-			<a href="/shuffleboard" class="logo logo-link"><span class="fbo-title-mark-black">FBO</span> <sup>Shuffleboard</sup></a>
+			<a href="/shuffleboard" class="logo logo-link"><span class="fbo-title-mark-black">FBO</span> Shuffleboard</a>
 			<div class="hero-right">
-				<div class="hero-actions shuffleboard-actions">
-					<a href="/login" class="ui-btn">Create blog</a>
-					<a href="/fbo/fbo" class="ui-btn shuffle-info-btn" aria-label="Project page" title="Project page">i</a>
+				<div class="hero-actions">
+					<a href="<?= htmlspecialchars($createBlogHref, ENT_QUOTES, 'UTF-8') ?>" class="ui-btn">create blog</a>
+					<a href="/fbo/fbo" class="ui-btn shuffle-info-btn" aria-label="About FBO" title="FBO info">i</a>
 				</div>
 			</div>
 		</div>
-		<div class="subtitle-line">Image posts by FBO blogs.</div>
+		<div class="subtitle-line">Image posts by blogs on FBO.</div>
 	</header>
 
-	<div class="shuffleboard-wrap">
-		<div class="shuffleboard-headline">
-			<div class="shuffleboard-headline-left">
+	<nav class="topbar shuffleboard-topbar">
+		<div class="shuffleboard-topbar-main">
+			<div class="shuffleboard-topbar-left-actions">
 				<button type="button" class="ui-btn" id="themeToggle">dark mode</button>
 			</div>
-			<div class="shuffleboard-headline-right">
-				<a href="<?= htmlspecialchars($shuffleRefreshUrl, ENT_QUOTES, 'UTF-8') ?>" class="ui-btn">shuffle</a>
+			<div class="shuffleboard-topbar-actions">
+				<button type="button" class="ui-btn" id="shuffleMaskNow">shuffle</button>
 			</div>
 		</div>
-		<div class="shuffleboard-meta-row">
-			<div class="shuffleboard-meta"><?= $optedInPostsCount ?> posts in shuffle</div>
-			<div class="shuffleboard-meta"><?= $createdBlogsCount ?> created blogs</div>
+		<div class="shuffleboard-topbar-meta">
+			<span class="meta"><?= $gridCardCount ?> posts in shuffle</span>
+			<span class="meta"><?= $blogCount ?> blogs created</span>
+		</div>
+	</nav>
+
+	<main class="shuffleboard-wrap" data-grid-count="<?= $gridCardCount ?>">
+		<div
+			class="shuffleboard-grid"
+			data-mask-image="<?= htmlspecialchars($maskImageCss, ENT_QUOTES, 'UTF-8') ?>"
+			data-grid-cols="<?= $cols ?>"
+			data-grid-rows="<?= $rows ?>"
+		>
+			<?php
+			$cursor = 0;
+			for ($rowIndex = 0; $rowIndex < $rows; $rowIndex++) {
+				$rowMask = $heartMask[$rowIndex];
+				for ($colIndex = 0; $colIndex < $cols; $colIndex++) {
+					$isPostSlot = ($rowMask[$colIndex] ?? '0') === '1';
+					$coordKey = $rowIndex . '-' . $colIndex;
+
+					if ($isPostSlot) {
+						if (isset($gridCards[$cursor])) {
+							$card = $gridCards[$cursor++];
+							?>
+							<article class="item shuffle-cell shuffle-item">
+								<a class="shuffle-post-link" href="<?= htmlspecialchars($card['post_url'], ENT_QUOTES, 'UTF-8') ?>">
+									<div class="shuffle-card-body">
+										<div class="media-wrap">
+											<img src="<?= htmlspecialchars($card['media_url'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($card['blog_name'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+										</div>
+									</div>
+								</a>
+								<div class="shuffle-blog-stamp"><?= htmlspecialchars($card['blog_name'], ENT_QUOTES, 'UTF-8') ?></div>
+							</article>
+							<?php
+						} else {
+							?>
+							<div class="shuffle-cell shuffle-empty" aria-hidden="true"></div>
+							<?php
+						}
+						continue;
+					}
+
+					if (isset($maskCoordLookup[$coordKey]) && $initialMaskCard !== null) {
+						?>
+						<a
+							class="shuffle-cell shuffle-mask-cell"
+							href="<?= htmlspecialchars((string) $initialMaskCard['post_url'], ENT_QUOTES, 'UTF-8') ?>"
+							data-mask-cell="1"
+							data-col="<?= $colIndex ?>"
+							data-row="<?= $rowIndex ?>"
+							aria-label="featured post"
+						></a>
+						<?php
+						continue;
+					}
+					?>
+					<div class="shuffle-cell shuffle-hole" aria-hidden="true"></div>
+					<?php
+				}
+			}
+			?>
 		</div>
 
-		<main class="shuffleboard-grid" style="--grid-cols: <?= $heartColCount ?>; --grid-rows: <?= $heartRowCount ?>; --mask-image: <?= htmlspecialchars($maskImageCss, ENT_QUOTES, 'UTF-8') ?>;">
-			<?php $cursor = 0; ?>
-			<?php foreach ($heartMask as $rowIndex => $rowMask): ?>
-				<?php for ($col = 0; $col < $heartColCount; $col++): ?>
-					<?php
-					$tileX = $heartColCount > 1 ? ($col / ($heartColCount - 1)) * 100 : 0;
-					$tileY = $heartRowCount > 1 ? ($rowIndex / ($heartRowCount - 1)) * 100 : 0;
-					$tileStyle = '--tile-x: ' . number_format($tileX, 4, '.', '') . '%; --tile-y: ' . number_format($tileY, 4, '.', '') . '%;';
-					?>
-					<?php if (($rowMask[$col] ?? '0') !== '1'): ?>
-						<?php if (is_array($maskCard)): ?>
-							<a
-								class="shuffle-cell shuffle-hole shuffle-mask-cell"
-								href="<?= htmlspecialchars((string) ($maskCard['post_url'] ?? '/'), ENT_QUOTES, 'UTF-8') ?>"
-								style="<?= htmlspecialchars($tileStyle, ENT_QUOTES, 'UTF-8') ?>"
-								aria-label="Open masked image post"
-							></a>
-						<?php else: ?>
-							<div class="shuffle-cell shuffle-hole" aria-hidden="true"></div>
-						<?php endif; ?>
-						<?php continue; ?>
-					<?php endif; ?>
-
-					<?php if (!isset($cards[$cursor])): ?>
-						<?php if (is_array($maskCard)): ?>
-							<a
-								class="shuffle-cell shuffle-empty shuffle-mask-cell"
-								href="<?= htmlspecialchars((string) ($maskCard['post_url'] ?? '/'), ENT_QUOTES, 'UTF-8') ?>"
-								style="<?= htmlspecialchars($tileStyle, ENT_QUOTES, 'UTF-8') ?>"
-								aria-label="Open masked image post"
-							></a>
-						<?php else: ?>
-							<div class="shuffle-cell shuffle-empty" aria-hidden="true"></div>
-						<?php endif; ?>
-						<?php continue; ?>
-					<?php endif; ?>
-
-					<?php $card = $cards[$cursor]; ?>
-					<?php $cursor++; ?>
-					<?php $blogNameRaw = trim((string) ($card['blog_name'] ?? '')); ?>
-					<?php $blogNameShort = mb_substr($blogNameRaw, 0, 12); ?>
-					<?php if (mb_strlen($blogNameRaw) > 12) {
-						$blogNameShort .= '..';
-					} ?>
-					<article class="item shuffle-cell shuffle-item">
-						<a class="shuffle-post-link" href="<?= htmlspecialchars((string) ($card['post_url'] ?? '/'), ENT_QUOTES, 'UTF-8') ?>">
-							<div class="shuffle-card-body">
-								<?php $mediaUrl = htmlspecialchars((string) ($card['media_url'] ?? ''), ENT_QUOTES, 'UTF-8'); ?>
-								<div class="media-wrap">
-									<img src="<?= $mediaUrl ?>" alt="Shuffleboard image post" loading="lazy">
-								</div>
-							</div>
-						</a>
-						<div class="shuffle-blog-stamp"><?= htmlspecialchars($blogNameShort, ENT_QUOTES, 'UTF-8') ?></div>
-					</article>
-				<?php endfor; ?>
-			<?php endforeach; ?>
-		</main>
-
-		<?php if ($cards === []): ?>
-			<div class="shuffleboard-empty-state">No image posts are enabled for FBO Shuffleboard yet. In compose mode, creators can allow image posts on Shuffleboard.</div>
-		<?php endif; ?>
-
-		<section class="shuffle-search-block">
-			<div class="shuffle-search-hint">Existing blogs</div>
-			<input type="search" id="shuffleBlogSearch" class="shuffle-search-input" placeholder="Search blog name..." autocomplete="off" spellcheck="false">
+		<section class="shuffle-search-block" aria-labelledby="shuffleSearchLabel">
+			<label class="shuffle-search-label" id="shuffleSearchLabel" for="shuffleBlogSearch">Search blogs</label>
+			<input
+				type="search"
+				id="shuffleBlogSearch"
+				class="shuffle-search-input"
+				placeholder="Search by blog word"
+				autocomplete="off"
+				spellcheck="false"
+			>
 			<div class="shuffle-search-preview" id="shuffleSearchPreview"></div>
 		</section>
-	</div>
+	</main>
 
-	<script id="shuffleBlogsData" type="application/json"><?= json_encode($searchBlogs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
-	<script id="shuffleMaskCardsData" type="application/json"><?= json_encode($maskCardsData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
+	<script id="shuffleMaskCardsData" type="application/json"><?= htmlspecialchars(json_encode($cards, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_NOQUOTES, 'UTF-8') ?></script>
+	<script id="shuffleBlogsData" type="application/json"><?= htmlspecialchars(json_encode($blogs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_NOQUOTES, 'UTF-8') ?></script>
 	<script src="<?= local_asset_url('assets/js/script.js') ?>" defer></script>
 	<script src="<?= local_asset_url('assets/js/shuffleboard.js') ?>" defer></script>
 </body>
+
 </html>

@@ -1,5 +1,78 @@
 .shuffleboard-wrap {
     padding: 10px;
+    width: min(1080px, 100%);
+    margin: 0 auto;
+}
+
+.shuffleboard-page .hero .fbo-title-mark-black {
+    margin-right: 6px;
+}
+
+.shuffleboard-page.header-peek .hero {
+    border-bottom: 2px solid var(--line);
+    padding: 14px 14px 10px;
+}
+
+.shuffleboard-page.header-peek .hero> :not(.hero-head) {
+    display: block;
+}
+
+.shuffleboard-page.header-peek .hero-head {
+    position: static;
+    height: auto;
+    padding: 0;
+    background: transparent;
+    border-bottom: 0;
+    transition: none;
+    align-items: baseline;
+}
+
+.shuffleboard-page.header-peek .hero-right {
+    margin-left: auto;
+}
+
+.shuffleboard-page.header-peek .hero-actions {
+    display: flex;
+}
+
+.shuffleboard-page .topbar {
+    position: static;
+    top: auto;
+    z-index: auto;
+    align-items: stretch;
+}
+
+.shuffleboard-topbar-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.shuffleboard-topbar {
+    display: grid;
+    gap: 8px;
+}
+
+.shuffleboard-topbar-main,
+.shuffleboard-topbar-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.shuffleboard-topbar-spacer {
+    min-width: 1px;
+}
+
+.shuffleboard-topbar-left-actions,
+.shuffleboard-topbar-actions {
+    display: flex;
+    align-items: center;
+}
+
+.shuffleboard-topbar-meta .meta {
+    white-space: normal;
 }
 
 .shuffleboard-headline {
@@ -38,6 +111,9 @@
 }
 
 .shuffleboard-grid {
+    --grid-cols: 11;
+    --grid-rows: 9;
+    --mask-image: none;
     display: grid;
     grid-template-columns: repeat(11, minmax(0, 1fr));
     grid-auto-flow: row;
@@ -59,7 +135,7 @@
 
 .shuffle-hole {
     border: 1px solid var(--line);
-    background: #fff;
+    background: color-mix(in srgb, var(--bg) 96%, var(--fg) 4%);
     width: 100%;
     height: 100%;
 }
@@ -76,6 +152,7 @@
     display: block;
     opacity: 1;
     will-change: opacity;
+    cursor: pointer;
     text-decoration: none;
     background-color: #140000;
     background-image: linear-gradient(0deg, #ff1a1a 0%, #ff1a1a 100%), var(--mask-image);
@@ -197,10 +274,10 @@
 }
 
 .shuffle-info-btn {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 400;
     font-family: inherit;
-    line-height: 1;
+    line-height: 1.2;
     text-transform: lowercase;
 }
 
@@ -214,9 +291,9 @@
 
 .shuffle-search-label {
     font-size: 13px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
 }
 
 .shuffle-search-input {
@@ -330,6 +407,16 @@
     .shuffleboard-headline-right {
         align-items: flex-end;
         margin-left: auto;
+    }
+
+    .shuffleboard-topbar-main,
+    .shuffleboard-topbar-meta {
+        align-items: flex-start;
+    }
+
+    .shuffleboard-topbar-meta {
+        flex-direction: column;
+        gap: 4px;
     }
 
     .shuffleboard-grid .media-fbo-indicator {
