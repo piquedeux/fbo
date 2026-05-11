@@ -5,11 +5,10 @@
     <div class="subtitle-line">Post media and text to your blog in #composemode</div>
 
 <div class="compose-section">
-    <button type="button" class="compose-section-header" id="uploadMediaToggleBtn" aria-expanded="true">
+    <div class="compose-section-header">
         <span class="compose-section-icon" aria-hidden="true">1.</span>
         <span class="compose-section-title">Upload Media</span>
-        <span class="compose-section-arrow">▼</span>
-    </button>
+    </div>
     <form method="post" enctype="multipart/form-data" class="upload-panel" id="inlineUploadForm">
         <input type="file" id="inlineUploadFiles" class="upload-auth-input" name="files[]" accept="image/*,video/*,audio/*,.mp3,.wav,.flac" multiple required>
         <label class="upload-checkbox-row" for="includeExifLocation">
@@ -33,12 +32,11 @@
 <div class="compose-section-separator">or</div>
 
 <div class="compose-section">
-    <button type="button" class="compose-section-header" id="textPostToggleBtn" aria-expanded="false">
+    <div class="compose-section-header">
         <span class="compose-section-icon" aria-hidden="true">2.</span>
         <span class="compose-section-title">Write Text Post</span>
-        <span class="compose-section-arrow">▼</span>
-    </button>
-    <form method="post" class="upload-panel" id="textPostForm" hidden>
+    </div>
+    <form method="post" class="upload-panel" id="textPostForm">
         <textarea id="textPostContent" name="text_post_content" maxlength="<?= MAX_TEXT_POST_LENGTH ?>"
             placeholder="Write a text post (max <?= MAX_TEXT_POST_LENGTH ?> chars)" required></textarea>
         <input type="hidden" id="textPostClientEpoch" name="text_post_client_epoch" value="">
