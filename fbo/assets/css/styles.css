@@ -1348,6 +1348,16 @@ audio {
 	letter-spacing: 0.02em;
 }
 
+.media-caption {
+	padding: 7px 9px;
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--fg);
+	border-top: 2px solid var(--line);
+	line-height: 1.35;
+	word-break: break-word;
+}
+
 .post-meta-row {
 	display: flex;
 	align-items: center;

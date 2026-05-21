@@ -17,7 +17,7 @@
 	</form>
 
 	<div class="hero-actions">
-		<a href="?<?= $blogQ ?>download_backup=1" class="ui-btn">Download your whole blog! All imaes and data as a .zip
+		<a href="?<?= $blogQ ?>download_backup=1" class="ui-btn ui-btn-strong" id="downloadBackupBtn">Download your whole blog! All imaes and data as a .zip
 			file.</a>
 	</div>
 
@@ -25,6 +25,7 @@
 		<input type="hidden" name="delete_blog" value="1">
 		<input type="hidden" name="delete_blog_confirm_compose" id="deleteBlogConfirmCompose" value="0">
 		<input type="hidden" name="delete_blog_confirm_irreversible" id="deleteBlogConfirmIrreversible" value="0">
+		<input type="hidden" name="delete_blog_compose_url" id="deleteBlogComposeUrl" value="?<?= $blogQ ?>compose=1">
 		<div class="subtitle-line danger-note">Danger zone: permanently delete this blog, all media files, and all backend
 			data.</div>
 		<input type="password" class="upload-auth-input" name="delete_blog_password" maxlength="120"
@@ -32,8 +33,18 @@
 		<div class="hero-actions">
 			<button type="submit" class="ui-btn danger-btn">Delete blog permanently</button>
 		</div>
+		<div class="subtitle-line danger-note">This cannot be undone and cannot be restored.</div>
 	</form>
-	<div class="subtitle-line danger-note">This cannot be undone and cannot be restored.</div>
+
+	<div class="blog-modal-overlay" id="blogActionModal" hidden>
+		<div class="blog-modal" role="dialog" aria-modal="true" aria-labelledby="blogActionModalTitle">
+			<button type="button" class="blog-modal-close" id="blogActionModalClose" aria-label="Close dialog">×</button>
+			<div class="blog-modal-kicker" id="blogActionModalKicker"></div>
+			<h2 class="blog-modal-title" id="blogActionModalTitle"></h2>
+			<div class="blog-modal-body" id="blogActionModalBody"></div>
+			<div class="blog-modal-actions" id="blogActionModalActions"></div>
+		</div>
+	</div>
 	<?php if ($flashMessage !== ''): ?>
 		<div class="subtitle-line"><?= htmlspecialchars($flashMessage, ENT_QUOTES, 'UTF-8') ?></div>
 	<?php endif; ?>

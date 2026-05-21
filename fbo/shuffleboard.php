@@ -182,10 +182,10 @@ $blogCount = count($blogs);
 <body class="shuffleboard-page">
 	<header class="hero">
 		<div class="hero-head">
-			<a href="/shuffleboard" class="logo logo-link"><span class="fbo-title-mark-black">FBO</span> Shuffleboard</a>
+			<a href="/" class="logo logo-link"><span class="fbo-title-mark-black">FBO</span> Shuffleboard</a>
 			<div class="hero-right">
 				<div class="hero-actions">
-					<a href="<?= htmlspecialchars($createBlogHref, ENT_QUOTES, 'UTF-8') ?>" class="ui-btn">create blog</a>
+					<a href="/login" class="ui-btn">create blog</a>
 					<a href="/fbo/fbo" class="ui-btn shuffle-info-btn" aria-label="About FBO" title="FBO info">i</a>
 				</div>
 			</div>
@@ -273,7 +273,7 @@ $blogCount = count($blogs);
 				type="search"
 				id="shuffleBlogSearch"
 				class="shuffle-search-input"
-				placeholder="Search by blog word"
+				placeholder="Search by BLOGNAME"
 				autocomplete="off"
 				spellcheck="false"
 			>

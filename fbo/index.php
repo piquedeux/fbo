@@ -38,11 +38,34 @@ if (!function_exists('array_is_list')) {
 session_start();
 
 const MAX_TEXT_POST_LENGTH = 280;
-const MAX_UPLOAD_FILE_SIZE_BYTES = 104857600;
-const MAX_UPLOAD_FILES_PER_REQUEST = 10;
-const MEDIA_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'mp4', 'mov', 'webm', 'm4v', 'mp3', 'wav', 'flac', 'ogg', 'm4a'];
+const MAX_IMAGE_UPLOAD_FILE_SIZE_BYTES = 10485760;
+const MAX_IMAGE_UPLOAD_FILES_PER_REQUEST = 10;
+const MAX_VIDEO_UPLOAD_FILE_SIZE_BYTES = 314572800;
+const MAX_VIDEO_UPLOAD_FILES_PER_REQUEST = 1;
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+const VIDEO_EXTENSIONS = ['mp4', 'mov', 'webm', 'm4v'];
+const MAX_MEDIA_CAPTION_LENGTH = 67;
 const BLOG_WORD_MAX_LENGTH = 24;
 const SHUFFLE_MODE_THRESHOLD = 100;
+
+function media_upload_kind(string $extension, string $reportedMime = ''): ?string
+{
+	$extension = strtolower(trim($extension));
+	$reportedMime = strtolower(trim($reportedMime));
+
+	if (in_array($extension, IMAGE_EXTENSIONS, true) || str_starts_with($reportedMime, 'image/')) {
+		return 'image';
+	}
+
+	if (in_array($extension, VIDEO_EXTENSIONS, true) || str_starts_with($reportedMime, 'video/')) {
+		if ($extension === 'webm' && str_starts_with($reportedMime, 'audio/')) {
+			return null;
+		}
+		return 'video';
+	}
+
+	return null;
+}
 
 function blog_root(): string
 {
@@ -90,6 +113,11 @@ function posts_path(): string
 	return backend_dir_path() . '/posts.json';
 }
 
+function captions_path(): string
+{
+	return backend_dir_path() . '/captions.json';
+}
+
 function media_dir_path(): string
 {
 	$path = blog_root() . '/media';
@@ -100,6 +128,47 @@ function media_dir_path(): string
 		}
 	}
 	return $path;
+}
+
+function backup_estimate_size_bytes(): int
+{
+	$totalBytes = 0;
+	$paths = [
+		posts_path(),
+		captions_path(),
+		settings_path(),
+		auth_path(),
+	];
+
+	foreach ($paths as $path) {
+		if (is_file($path)) {
+			$fileSize = @filesize($path);
+			if (is_int($fileSize) && $fileSize > 0) {
+				$totalBytes += $fileSize;
+			}
+		}
+	}
+
+	$mediaDir = media_dir_path();
+	if (is_dir($mediaDir)) {
+		$realMedia = safe_realpath_within($mediaDir, blog_root());
+		if ($realMedia !== null && is_dir($realMedia)) {
+			$iterator = new RecursiveIteratorIterator(
+				new RecursiveDirectoryIterator($realMedia, FilesystemIterator::SKIP_DOTS)
+			);
+			foreach ($iterator as $fileInfo) {
+				if (!$fileInfo->isFile()) {
+					continue;
+				}
+				$fileSize = (int) $fileInfo->getSize();
+				if ($fileSize > 0) {
+					$totalBytes += $fileSize;
+				}
+			}
+		}
+	}
+
+	return $totalBytes;
 }
 
 function asset_url(string $path): string
@@ -185,6 +254,18 @@ function blog_self_url(): string
 	$uri = (string) ($_SERVER['REQUEST_URI'] ?? '/');
 	$path = (string) (parse_url($uri, PHP_URL_PATH) ?? '/');
 	return $scheme . '://' . $host . $path;
+}
+
+function absolute_blog_asset_url(string $path): string
+{
+	$resolved = asset_url($path);
+	if ($resolved === '' || preg_match('#^https?://#i', $resolved) === 1) {
+		return $resolved;
+	}
+
+	$scheme = request_scheme();
+	$host = (string) ($_SERVER['HTTP_HOST'] ?? 'example.com');
+	return $scheme . '://' . $host . '/' . ltrim($resolved, '/');
 }
 
 
@@ -481,7 +562,7 @@ function delete_directory_recursive(string $dir): bool
 function delete_single_tenant_blog_data(): bool
 {
 	clear_media_files();
-	$targets = [posts_path(), settings_path(), auth_path(), otp_path()];
+	$targets = [posts_path(), captions_path(), settings_path(), auth_path(), otp_path()];
 	foreach ($targets as $target) {
 		if (is_file($target) && !@unlink($target)) {
 			return false;
@@ -878,6 +959,125 @@ function normalize_post_entry(array $item): ?array
 	}
 
 	return $result;
+}
+
+function normalize_media_caption_word(string $token): string
+{
+	// no-op normalization for individual tokens -- we allow most characters now
+	return $token;
+}
+
+function normalize_media_caption(string $value): string
+{
+	// remove line breaks and tabs, trim
+	$s = str_replace(array("\r", "\n", "\t"), '', (string) $value);
+	$s = trim($s);
+	if ($s === '') {
+		return '';
+	}
+
+	if (mb_strlen($s) <= MAX_MEDIA_CAPTION_LENGTH) {
+		return $s;
+	}
+
+	return mb_substr($s, 0, MAX_MEDIA_CAPTION_LENGTH);
+}
+
+function default_media_caption_from_filename(string $filename): string
+{
+	$base = trim((string) pathinfo($filename, PATHINFO_FILENAME));
+	if ($base === '') {
+		return '';
+	}
+
+	// replace underscores and slashes with spaces, remove newlines/tabs
+	$clean = preg_replace('/[_\/]+/', ' ', $base) ?? $base;
+	$clean = str_replace(array("\r", "\n", "\t"), ' ', $clean);
+	$clean = trim($clean);
+	if ($clean === '') return '';
+
+	$tokens = preg_split('/\s+/', $clean) ?: [];
+
+	// Drop trailing purely numeric tokens so filename suffixes do not become captions.
+	while (count($tokens) > 1) {
+		$last = (string) ($tokens[count($tokens) - 1] ?? '');
+		if ($last !== '' && preg_match('/^\d+$/', $last) === 1) {
+			array_pop($tokens);
+			continue;
+		}
+		break;
+	}
+
+	$joined = implode(' ', $tokens);
+	return normalize_media_caption($joined);
+}
+
+function resolve_media_caption(string $rawCaption, string $filename, bool $allowFilenameFallback = true): string
+{
+	$normalized = normalize_media_caption($rawCaption);
+	if ($normalized !== '') {
+		return $normalized;
+	}
+
+	if (!$allowFilenameFallback) {
+		return '';
+	}
+
+	return normalize_media_caption(default_media_caption_from_filename($filename));
+}
+
+function load_captions(): array
+{
+	$path = captions_path();
+	if (!is_file($path)) {
+		return [];
+	}
+
+	$decoded = json_decode((string) file_get_contents($path), true);
+	if (!is_array($decoded)) {
+		return [];
+	}
+
+	$items = [];
+	if (isset($decoded['items']) && is_array($decoded['items'])) {
+		$items = $decoded['items'];
+	} elseif (!array_is_list($decoded)) {
+		$items = $decoded;
+	}
+
+	$result = [];
+	foreach ($items as $postId => $caption) {
+		$id = trim((string) $postId);
+		if ($id === '') {
+			continue;
+		}
+		$normalized = normalize_media_caption((string) $caption);
+		if ($normalized === '') {
+			continue;
+		}
+		$result[$id] = $normalized;
+	}
+
+	return $result;
+}
+
+function save_captions(array $captions): void
+{
+	$normalized = [];
+	foreach ($captions as $postId => $caption) {
+		$id = trim((string) $postId);
+		if ($id === '') {
+			continue;
+		}
+		$value = normalize_media_caption((string) $caption);
+		if ($value === '') {
+			continue;
+		}
+		$normalized[$id] = $value;
+	}
+
+	$payload = ['items' => $normalized];
+	file_put_contents(captions_path(), json_encode($payload, JSON_UNESCAPED_SLASHES));
 }
 
 function safe_realpath_within(string $path, string $basePath): ?string
@@ -1303,9 +1503,18 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['create_tex
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_media']) && $adminAuthed) {
 	$files = $_FILES['files'] ?? null;
+	$rawCaptions = $_POST['media_captions'] ?? [];
+	$useFilenameCaption = $_POST['use_filename_caption'] ?? [];
+	if (!is_array($rawCaptions)) {
+		$rawCaptions = [];
+	}
+	if (!is_array($useFilenameCaption)) {
+		$useFilenameCaption = [];
+	}
 	$saved = 0;
 	$failed = 0;
 	$newPosts = [];
+	$newCaptions = [];
 	$allowShuffleboard = (string) ($_POST['allow_shuffleboard_media'] ?? '') === '1';
 	$attachExifLocation = (string) ($_POST['include_exif_location'] ?? '') === '1';
 	$instantLocationCoords = trim((string) ($_POST['instant_location_coords'] ?? ''));
@@ -1323,8 +1532,38 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 
 	if (is_array($files) && isset($files['name'], $files['tmp_name'], $files['error']) && is_array($files['name'])) {
 		$count = count($files['name']);
-		if ($count > MAX_UPLOAD_FILES_PER_REQUEST) {
-			set_flash_message('Upload limit: max ' . MAX_UPLOAD_FILES_PER_REQUEST . ' files per upload.');
+		$imageCount = 0;
+		$videoCount = 0;
+		for ($index = 0; $index < $count; $index++) {
+			$err = (int) ($files['error'][$index] ?? UPLOAD_ERR_NO_FILE);
+			if ($err !== UPLOAD_ERR_OK) {
+				continue;
+			}
+			$name = (string) ($files['name'][$index] ?? '');
+			$reportedMime = strtolower(trim((string) ($files['type'][$index] ?? '')));
+			$extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+			$kind = media_upload_kind($extension, $reportedMime);
+			if ($kind === 'image') {
+				$imageCount++;
+			} elseif ($kind === 'video') {
+				$videoCount++;
+			}
+		}
+
+		if ($imageCount > 0 && $videoCount > 0) {
+			set_flash_message('Upload limit: select either up to ' . MAX_IMAGE_UPLOAD_FILES_PER_REQUEST . ' images or 1 video per upload.');
+			header('Location: ?' . $blogQ . 'compose=1');
+			exit;
+		}
+
+		if ($videoCount > MAX_VIDEO_UPLOAD_FILES_PER_REQUEST) {
+			set_flash_message('Upload limit: max ' . MAX_VIDEO_UPLOAD_FILES_PER_REQUEST . ' video per upload.');
+			header('Location: ?' . $blogQ . 'compose=1');
+			exit;
+		}
+
+		if ($imageCount > MAX_IMAGE_UPLOAD_FILES_PER_REQUEST) {
+			set_flash_message('Upload limit: max ' . MAX_IMAGE_UPLOAD_FILES_PER_REQUEST . ' images per upload.');
 			header('Location: ?' . $blogQ . 'compose=1');
 			exit;
 		}
@@ -1334,19 +1573,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 			$err = (int) ($files['error'][$index] ?? UPLOAD_ERR_NO_FILE);
 			$size = (int) ($files['size'][$index] ?? 0);
 			$reportedMime = strtolower(trim((string) ($files['type'][$index] ?? '')));
-
-			if ($err !== UPLOAD_ERR_OK || $name === '' || $tmp === '') {
-				$failed++;
-				continue;
-			}
-
-			if ($size <= 0 || $size > MAX_UPLOAD_FILE_SIZE_BYTES) {
-				$failed++;
-				continue;
-			}
-
 			$extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-			if (!in_array($extension, MEDIA_EXTENSIONS, true)) {
+			$kind = media_upload_kind($extension, $reportedMime);
+
+			if ($err !== UPLOAD_ERR_OK || $name === '' || $tmp === '' || $kind === null) {
+				$failed++;
+				continue;
+			}
+
+			$sizeLimit = $kind === 'video' ? MAX_VIDEO_UPLOAD_FILE_SIZE_BYTES : MAX_IMAGE_UPLOAD_FILE_SIZE_BYTES;
+			if ($size <= 0 || $size > $sizeLimit) {
 				$failed++;
 				continue;
 			}
@@ -1385,31 +1621,23 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 					finfo_close($finfo);
 				}
 			}
-			$effectiveMime = $detectedMime !== '' ? $detectedMime : $reportedMime;
+			$type = $kind;
 
-			$type = 'image';
-			if (in_array($extension, ['mp4', 'mov', 'm4v'], true)) {
-				$type = 'video';
-			} elseif ($extension === 'webm') {
-				if (str_starts_with($reportedMime, 'video/')) {
-					$type = 'video';
-				} elseif (str_starts_with($reportedMime, 'audio/')) {
-					$type = 'audio';
-				} else {
-					$type = str_starts_with($effectiveMime, 'audio/') ? 'audio' : 'video';
-				}
-			} elseif (in_array($extension, ['mp3', 'wav', 'flac', 'ogg', 'm4a'], true)) {
-				$type = 'audio';
-			}
-
+			$postId = 'media_' . $clientUploadTimestamp . '_' . bin2hex(random_bytes(3));
 			$postEntry = [
-				'id' => 'media_' . $clientUploadTimestamp . '_' . bin2hex(random_bytes(3)),
+				'id' => $postId,
 				'type' => $type,
 				'path' => 'media/' . $targetName,
 				'allow_shuffleboard' => $allowShuffleboard && $type === 'image',
 				'pinned' => false,
 				'timestamp' => extract_media_capture_timestamp($targetPath, $type) ?? $clientUploadTimestamp,
 			];
+
+			$allowFilenameFallback = (string) ($useFilenameCaption[$index] ?? '') === '1';
+			$resolvedCaption = resolve_media_caption((string) ($rawCaptions[$index] ?? ''), $name, $allowFilenameFallback);
+			if ($resolvedCaption !== '') {
+				$newCaptions[$postId] = $resolvedCaption;
+			}
 
 			if ($instantLocation !== null && !$manualLocationApplied) {
 				$postEntry['location_coords'] = $instantLocation['coords'];
@@ -1432,6 +1660,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 		$posts = load_posts();
 		$previousCount = count($posts);
 		save_posts(array_merge($newPosts, $posts));
+		if ($newCaptions !== []) {
+			$captions = load_captions();
+			foreach ($newCaptions as $postId => $caption) {
+				$captions[$postId] = $caption;
+			}
+			save_captions($captions);
+		}
 		$newCount = $previousCount + count($newPosts);
 		if ($previousCount < SHUFFLE_MODE_THRESHOLD && $newCount >= SHUFFLE_MODE_THRESHOLD) {
 			set_shuffle_activation_celebration();
@@ -1440,7 +1675,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 
 	$message = 'Uploaded: ' . $saved;
 	if ($failed > 0) {
-		$message .= ' | Failed: ' . $failed . ' (limit: ' . ((int) (MAX_UPLOAD_FILE_SIZE_BYTES / 1048576)) . 'MB per file)';
+		$message .= ' | Failed: ' . $failed . ' (limit: 10MB images, 300MB videos)';
 	}
 	set_flash_message($message);
 	header('Location: ?' . $blogQ . 'compose=1');
@@ -1464,6 +1699,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (isset($_POST['delete_pa
 	$failed = 0;
 	$posts = load_posts();
 	$nextPosts = [];
+	$deletedPostIds = [];
 
 	foreach ($posts as $post) {
 		$postId = (string) ($post['id'] ?? '');
@@ -1483,9 +1719,23 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (isset($_POST['delete_pa
 		}
 
 		$deleted++;
+		$deletedPostIds[] = $postId;
 	}
 
 	save_posts($nextPosts);
+	if ($deletedPostIds !== []) {
+		$captions = load_captions();
+		$changed = false;
+		foreach ($deletedPostIds as $deletedPostId) {
+			if (isset($captions[$deletedPostId])) {
+				unset($captions[$deletedPostId]);
+				$changed = true;
+			}
+		}
+		if ($changed) {
+			save_captions($captions);
+		}
+	}
 
 	$message = 'Deleted: ' . $deleted;
 	if ($failed > 0) {
@@ -1517,6 +1767,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['delete_pos
 	}
 	$posts = array_values(array_filter($posts, static fn(array $p): bool => (string) ($p['id'] ?? '') !== $postId));
 	save_posts($posts);
+	$captions = load_captions();
+	if (isset($captions[$postId])) {
+		unset($captions[$postId]);
+		save_captions($captions);
+	}
 	if ($deleteMediaPath !== '') {
 		$target = resolve_local_media_path_for_delete($deleteMediaPath);
 		if ($target !== null) {
@@ -1693,6 +1948,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && isset($_GET['download_bac
 
 	foreach ([
 		'posts.json' => $_backupDir . '/posts.json',
+		'captions.json' => $_backupDir . '/captions.json',
 		'settings.json' => $_backupDir . '/settings.json',
 		'.auth.json' => $_backupDir . '/.auth.json',
 	] as $_zipName => $_filePath) {
@@ -1738,8 +1994,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && isset($_GET['download_bac
 }
 
 $posts = load_posts();
+$captions = load_captions();
 $canonicalUrl = blog_self_url();
-$socialPreviewImageUrl = rtrim($canonicalUrl, '/') . '/assets/icon/heart-icon.png';
 $allPostsCount = count($posts);
 $singlePostMode = false;
 if ($requestedPostId !== '' && !$composeMode) {
@@ -1753,6 +2009,19 @@ if ($requestedPostId !== '' && !$composeMode) {
 		$posts = [$post];
 		$page = 1;
 		break;
+	}
+}
+
+$sharePreviewImageUrl = absolute_blog_asset_url('assets/icon/heart-icon.png');
+$ogType = 'website';
+$twitterCardType = 'summary';
+if ($singlePostMode) {
+	$ogType = 'article';
+	$activePost = $posts[0] ?? null;
+	$activePostType = (string) ($activePost['type'] ?? '');
+	if ($activePostType === 'image') {
+		$sharePreviewImageUrl = absolute_blog_asset_url((string) ($activePost['path'] ?? ''));
+		$twitterCardType = 'summary_large_image';
 	}
 }
 
@@ -1806,6 +2075,8 @@ if (!$shuffleActive && $shuffleEligible) {
 	$shuffleToggleQuery .= '&shuffle=1&shuffle_seed=' . rawurlencode((string) $shuffleSeed);
 }
 
+$backupEstimateBytes = backup_estimate_size_bytes();
+
 $perPage = $view === 'grid' ? 180 : 60;
 $totalItems = count($posts);
 $totalPages = max(1, (int) ceil($totalItems / max(1, $perPage)));
@@ -1828,13 +2099,13 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<meta name="description" content="A blogging tool for people tired of platforms. Open source. No ads. No app. No ai.">
 	<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
-	<meta property="og:type" content="website">
+	<meta property="og:type" content="<?= htmlspecialchars($ogType, ENT_QUOTES, 'UTF-8') ?>">
 	<meta property="og:title" content="<?= htmlspecialchars($siteNameDisplay, ENT_QUOTES, 'UTF-8') ?>">
 	<meta property="og:description" content="A blogging tool for people tired of platforms. Open source. No ads. No app. No ai.">
 	<meta property="og:url" content="<?= htmlspecialchars($canonicalUrl, ENT_QUOTES, 'UTF-8') ?>">
-	<meta property="og:image" content="<?= local_asset_url('assets/icon/heart-icon.png') ?>">
-	<meta name="twitter:card" content="summary">
-	<meta name="twitter:image" content="<?= local_asset_url('assets/icon/heart-icon.png') ?>">
+	<meta property="og:image" content="<?= htmlspecialchars($sharePreviewImageUrl, ENT_QUOTES, 'UTF-8') ?>">
+	<meta name="twitter:card" content="<?= htmlspecialchars($twitterCardType, ENT_QUOTES, 'UTF-8') ?>">
+	<meta name="twitter:image" content="<?= htmlspecialchars($sharePreviewImageUrl, ENT_QUOTES, 'UTF-8') ?>">
 	<meta name="twitter:title" content="<?= htmlspecialchars($siteNameDisplay, ENT_QUOTES, 'UTF-8') ?>">
 	<meta name="twitter:description" content="A blogging tool for people tired of platforms. Open source. No ads. No app. No ai.">
 	<link rel="icon" type="image/png" href="<?= local_asset_url('assets/icon/icon.png') ?>">
@@ -1850,7 +2121,8 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 </head>
 
 <body class="<?= $showIntroAnimation ? 'intro-loading' : '' ?>" data-max-text-post-length="<?= MAX_TEXT_POST_LENGTH ?>"
-	data-compose-mode="<?= $composeMode ? '1' : '0' ?>" data-shuffle-celebration="<?= $shuffleCelebrationActive ? '1' : '0' ?>">
+	data-compose-mode="<?= $composeMode ? '1' : '0' ?>" data-shuffle-celebration="<?= $shuffleCelebrationActive ? '1' : '0' ?>"
+	data-backup-estimate-bytes="<?= (int) $backupEstimateBytes ?>">
 	<div class="intro-overlay" id="introOverlay" aria-hidden="true">
 		<div class="intro-fbo" id="introFboText">F</div>
 	</div>
@@ -1902,7 +2174,9 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 			<?php foreach ($postsOnPage as $post): ?>
 				<?php $isPinned = !empty($post['pinned']); ?>
 				<?php $postType = (string) ($post['type'] ?? 'text'); ?>
+				<?php $postId = (string) ($post['id'] ?? ''); ?>
 				<?php $shuffleAllowed = ($postType === 'image') && !empty($post['allow_shuffleboard']); ?>
+				<?php $postCaption = in_array($postType, ['image', 'video', 'audio'], true) ? trim((string) ($captions[$postId] ?? '')) : ''; ?>
 				<?php $postMediaPath = in_array($postType, ['image', 'video', 'audio'], true) ? asset_url((string) ($post['path'] ?? '')) : ''; ?>
 				<?php $postLocationCoords = trim((string) ($post['location_coords'] ?? '')); ?>
 				<?php $postLocationLabel = trim((string) ($post['location_label'] ?? '')); ?>
@@ -1961,6 +2235,9 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 								<img src="<?= $mediaUrl ?>" alt="Uploaded media" loading="lazy">
 							<?php endif; ?>
 						</div>
+						<?php if ($postCaption !== '' && $view !== 'grid'): ?>
+							<div class="media-caption"><?= htmlspecialchars($postCaption, ENT_QUOTES, 'UTF-8') ?></div>
+						<?php endif; ?>
 					<?php endif; ?>
 					<?php if ($isPinned): ?>
 						<div class="pinned-badge<?= ($composeMode && $adminAuthed) ? ' with-delete' : '' ?>">Pinned</div>

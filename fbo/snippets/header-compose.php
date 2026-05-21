@@ -4,13 +4,21 @@
     <?php endif; ?>
     <div class="subtitle-line">Post media and text to your blog in #composemode</div>
 
+<div class="hero-actions">
+    <button type="button" class="ui-btn ui-btn-strong" id="saveCancelUploadBtn"
+        data-close-url="?<?= $blogQ ?>view=<?= $view ?>&page=<?= $page ?>">Cancel</button>
+</div>
+
 <div class="compose-section">
     <div class="compose-section-header">
         <span class="compose-section-icon" aria-hidden="true">1.</span>
         <span class="compose-section-title">Upload Media</span>
     </div>
     <form method="post" enctype="multipart/form-data" class="upload-panel" id="inlineUploadForm">
-        <input type="file" id="inlineUploadFiles" class="upload-auth-input" name="files[]" accept="image/*,video/*,audio/*,.mp3,.wav,.flac" multiple required>
+        <input type="file" id="inlineUploadFiles" class="upload-auth-input" name="files[]" accept="image/*,video/*" multiple required>
+        <div class="upload-note upload-note-hint" id="inlineUploadHint">Images: up to 10 files, 10MB each. Videos: 1 file, 300MB.</div>
+        <div class="upload-note upload-note-counter" id="inlineUploadCounter">No files selected yet.</div>
+        <div class="upload-note upload-note-status" id="inlineUploadStatus">Select only images or one video per upload.</div>
         <label class="upload-checkbox-row" for="includeExifLocation">
             <input type="checkbox" id="includeExifLocation" name="include_exif_location" value="1">
             <span>Use photos/videos location if available</span>
@@ -25,7 +33,7 @@
         </div>
         <div id="inlineUploadPreview" class="upload-preview"></div>
         <div id="inlineUploadEmpty" class="upload-empty">No files selected yet.</div>
-        <div class="upload-note">Files are previewed as post cards before upload (max <?= MAX_UPLOAD_FILES_PER_REQUEST ?> files, <?= (int)(MAX_UPLOAD_FILE_SIZE_BYTES / 1048576) ?>MB each).</div>
+        
     </form>
 </div>
 
@@ -47,6 +55,11 @@
     </form>
 </div>
 
+<div class="hero-actions">
+    <button type="button" class="ui-btn ui-btn-strong" id="saveCloseUploadBtn"
+        data-close-url="?<?= $blogQ ?>view=<?= $view ?>&page=<?= $page ?>">Close</button>
+</div>
+
 <form method="post" class="upload-panel pending-delete-actions" id="pendingDeleteForm">
     <input type="hidden" name="delete_page_posts" value="1">
     <input type="hidden" name="close_after_save" id="closeAfterSaveInput" value="0">
@@ -58,10 +71,6 @@
     <div id="pendingDeleteInputs"></div>
 </form>
 
-<div class="hero-actions">
-    <button type="button" class="ui-btn ui-btn-strong" id="saveCloseUploadBtn"
-        data-close-url="?<?= $blogQ ?>view=<?= $view ?>&page=<?= $page ?>">Close</button>
-</div>
 <?php else: ?>
     <?php if ($authError !== ''): ?>
         <div class="subtitle-line auth-error"><?= htmlspecialchars($authError, ENT_QUOTES, 'UTF-8') ?></div>

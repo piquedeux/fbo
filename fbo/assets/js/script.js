@@ -566,6 +566,203 @@
   const grid = document.querySelector(".archive.grid");
   if (!grid) return;
 
+  const thumbs = Array.from(
+    document.querySelectorAll(".archive.grid .grid-video-thumb"),
+  );
+  if (thumbs.length) {
+    const inViewport = window.matchMedia("(max-width: 700px)").matches
+      ? 260
+      : 180;
+    const rootMargin = `${inViewport}px 0px`;
+    const maxConcurrent = 1;
+    const queue = [];
+    let active = 0;
+
+    const waitForEvent = (target, eventName, timeoutMs = 2500) => {
+      return new Promise((resolve, reject) => {
+        const timer = window.setTimeout(() => {
+          cleanup();
+          reject(new Error("timeout"));
+        }, timeoutMs);
+
+        const cleanup = () => {
+          window.clearTimeout(timer);
+          target.removeEventListener(eventName, onDone);
+          target.removeEventListener("error", onError);
+        };
+
+        const onDone = () => {
+          cleanup();
+          resolve();
+        };
+
+        const onError = () => {
+          cleanup();
+          reject(new Error("error"));
+        };
+
+        target.addEventListener(eventName, onDone, { once: true });
+        target.addEventListener("error", onError, { once: true });
+      });
+    };
+
+    const drawCoverFrame = (ctx, video, dx, dy, dw, dh) => {
+      const srcW = Math.max(1, video.videoWidth || 1);
+      const srcH = Math.max(1, video.videoHeight || 1);
+      const srcAspect = srcW / srcH;
+      const dstAspect = dw / dh;
+      let sx = 0;
+      let sy = 0;
+      let sw = srcW;
+      let sh = srcH;
+
+      if (srcAspect > dstAspect) {
+        sw = Math.max(1, Math.round(srcH * dstAspect));
+        sx = Math.max(0, Math.round((srcW - sw) / 2));
+      } else {
+        sh = Math.max(1, Math.round(srcW / dstAspect));
+        sy = Math.max(0, Math.round((srcH - sh) / 2));
+      }
+
+      ctx.drawImage(video, sx, sy, sw, sh, dx, dy, dw, dh);
+    };
+
+    const buildPosterSheet = async (thumb) => {
+      if (thumb.dataset.posterReady === "1") return;
+      const src = thumb.currentSrc || thumb.getAttribute("src") || "";
+      if (!src) return;
+
+      const probe = document.createElement("video");
+      probe.preload = "auto";
+      probe.muted = true;
+      probe.playsInline = true;
+      probe.setAttribute("webkit-playsinline", "true");
+      probe.src = src;
+      probe.style.position = "fixed";
+      probe.style.left = "-99999px";
+      probe.style.top = "0";
+      probe.style.width = "1px";
+      probe.style.height = "1px";
+      probe.style.opacity = "0";
+      probe.style.pointerEvents = "none";
+      document.body.appendChild(probe);
+
+      try {
+        if (probe.readyState < 1) {
+          await waitForEvent(probe, "loadedmetadata");
+        }
+
+        const duration = Number.isFinite(probe.duration) ? probe.duration : 0;
+        const safeEnd = Math.max(0.15, duration > 0 ? duration - 0.15 : 0.15);
+        const sampleTimes =
+          duration > 0.6
+            ? [0.12, Math.max(0.12, duration * 0.5), safeEnd]
+            : [0.12, 0.12, 0.12];
+
+        const canvas = document.createElement("canvas");
+        const outW = 360;
+        const outH = 480;
+        canvas.width = outW;
+        canvas.height = outH;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(0, 0, outW, outH);
+
+        const sliceH = Math.floor(outH / 3);
+        for (let index = 0; index < sampleTimes.length; index += 1) {
+          const time = Math.min(safeEnd, sampleTimes[index]);
+          await new Promise((resolve, reject) => {
+            const cleanup = () => {
+              probe.removeEventListener("seeked", onSeeked);
+              probe.removeEventListener("error", onError);
+            };
+            const onSeeked = () => {
+              cleanup();
+              resolve();
+            };
+            const onError = () => {
+              cleanup();
+              reject(new Error("seek error"));
+            };
+            probe.addEventListener("seeked", onSeeked, { once: true });
+            probe.addEventListener("error", onError, { once: true });
+            try {
+              probe.currentTime = time;
+            } catch (error) {
+              cleanup();
+              reject(error);
+            }
+          });
+
+          drawCoverFrame(
+            ctx,
+            probe,
+            0,
+            index * sliceH,
+            outW,
+            index === 2 ? outH - sliceH * 2 : sliceH,
+          );
+        }
+
+        thumb.poster = canvas.toDataURL("image/jpeg", 0.78);
+        thumb.dataset.posterReady = "1";
+      } catch {
+        // Leave the video element as-is if poster generation fails.
+      } finally {
+        probe.remove();
+      }
+    };
+
+    const pump = () => {
+      if (active >= maxConcurrent) return;
+      const next = queue.shift();
+      if (!next) return;
+      active += 1;
+      buildPosterSheet(next)
+        .catch(() => {})
+        .finally(() => {
+          active -= 1;
+          pump();
+        });
+    };
+
+    const enqueue = (thumb) => {
+      if (
+        thumb.dataset.posterState === "queued" ||
+        thumb.dataset.posterReady === "1"
+      ) {
+        return;
+      }
+      thumb.dataset.posterState = "queued";
+      queue.push(thumb);
+      pump();
+    };
+
+    if ("IntersectionObserver" in window) {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            const thumb = entry.target;
+            observer.unobserve(thumb);
+            enqueue(thumb);
+          });
+        },
+        {
+          root: null,
+          rootMargin,
+          threshold: 0.2,
+        },
+      );
+
+      thumbs.forEach((thumb) => observer.observe(thumb));
+    } else {
+      thumbs.forEach((thumb) => enqueue(thumb));
+    }
+  }
+
   const composeMode = document.body?.dataset?.composeMode === "1";
   if (composeMode) return;
 
