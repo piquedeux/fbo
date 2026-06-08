@@ -19,6 +19,8 @@ if (session_status() === PHP_SESSION_NONE) {
 	session_start();
 }
 
+require_once dirname(__DIR__) . '/multi-tenant/core/db.php';
+
 function local_asset_url(string $relativePath): string
 {
 	$cleanPath = ltrim($relativePath, '/');
@@ -63,10 +65,31 @@ function request_scheme(): string
 	return ((string) ($_SERVER['SERVER_PORT'] ?? '') === '443') ? 'https' : 'http';
 }
 
+function shuffle_format_date_time(string $date): string
+{
+	$dt = DateTime::createFromFormat('Y-m-d H:i:s', $date);
+	return $dt ? $dt->format('d.m.Y H:i') : $date;
+}
+
 $projectRoot = dirname(__DIR__);
 $blogsDir = $projectRoot . '/multi-tenant/blogs';
 $scheme = request_scheme();
 $host = (string) ($_SERVER['HTTP_HOST'] ?? 'example.com');
+
+$blogRows = function_exists('mt_list_blogs') ? mt_list_blogs() : [];
+$blogMetaByWord = [];
+foreach ($blogRows as $row) {
+	if (!is_array($row)) {
+		continue;
+	}
+	$blogWord = strtolower(trim((string) ($row['blog_word'] ?? '')));
+	if ($blogWord === '') {
+		continue;
+	}
+	$blogMetaByWord[$blogWord] = [
+		'created_at' => (string) ($row['created_at'] ?? ''),
+	];
+}
 
 $cards = [];
 $blogs = [];
@@ -76,7 +99,11 @@ if (is_dir($blogsDir)) {
 		return $dir !== '.' && $dir !== '..';
 	}));
 
-	foreach ($dirs as $word) {
+// Initialize counters before the loop
+$totalBlogsCount = 0;
+$activeBlogsCount = 0;
+
+Foreach ($dirs as $word) {
 		$blogPath = $blogsDir . '/' . $word;
 		if (!is_dir($blogPath)) {
 			continue;
@@ -85,14 +112,44 @@ if (is_dir($blogsDir)) {
 		$posts = get_json_data($blogPath . '/backend/posts.json');
 		$settings = get_json_data($blogPath . '/backend/settings.json');
 		$siteName = trim((string) ($settings['site_name'] ?? $word));
+		$wordKey = strtolower((string) $word);
+		$createdAt = (string) ($blogMetaByWord[$wordKey]['created_at'] ?? '');
+		if ($createdAt === '') {
+			$createdAt = date('Y-m-d H:i:s', (int) (@filemtime($blogPath) ?: time()));
+		}
+			$postCount = is_array($posts) ? count($posts) : 0;
+
+			if ($postCount <= 0) {
+				continue;
+			}
+
+			$mediaTypes = [];
+			foreach ($posts as $p) {
+				if (!is_array($p)) {
+					continue;
+				}
+				$t = strtolower(trim((string) ($p['type'] ?? '')));
+				if ($t === '') {
+					continue;
+				}
+				$mediaTypes[$t] = true;
+			}
+			$mediaTypesList = array_values(array_map('strval', array_keys($mediaTypes)));
+			$mediaTypesDisplay = $mediaTypesList ? implode(', ', $mediaTypesList) : 'mixed';
 		$blogUrl = '/blog/' . rawurlencode($word);
 		$fullUrl = $scheme . '://' . $host . $blogUrl;
 
 		$blogs[] = [
-			'word' => strtolower((string) $word),
+			'word' => $wordKey,
 			'url' => $blogUrl,
 			'fullUrl' => $fullUrl,
 			'name' => $siteName,
+			'post_count' => $postCount,
+			'media_types' => $mediaTypesList,
+			'media_types_display' => $mediaTypesDisplay,
+			'created_at' => $createdAt,
+			'created_at_display' => shuffle_format_date_time($createdAt),
+			'sort_created_at' => strtotime($createdAt) ?: 0,
 		];
 
 		foreach ($posts as $item) {
@@ -119,6 +176,29 @@ if (is_dir($blogsDir)) {
 		}
 	}
 }
+
+$blogs[] = [
+	'word' => 'moritz',
+	'url' => 'https://blog.piquedeux.de',
+	'fullUrl' => 'https://blog.piquedeux.de',
+	'name' => 'moritz',
+	'post_count' => 999,
+	'post_count_display' => '999+',
+	'media_types' => ['image', 'video', 'text', 'audio'],
+	'media_types_display' => 'image, video, text, audio',
+	'created_at' => '2026-01-01 00:00:00',
+	'created_at_display' => shuffle_format_date_time('2026-01-01 00:00:00'),
+	'sort_created_at' => 0,
+];
+
+usort($blogs, static function (array $left, array $right): int {
+	$leftSort = (int) ($left['sort_created_at'] ?? 0);
+	$rightSort = (int) ($right['sort_created_at'] ?? 0);
+	if ($leftSort !== $rightSort) {
+		return $rightSort <=> $leftSort;
+	}
+	return strcasecmp((string) ($left['name'] ?? ''), (string) ($right['name'] ?? ''));
+});
 
 if ($cards !== []) {
 	shuffle($cards);
@@ -154,16 +234,20 @@ $maskImageCss = $initialMaskCard !== null
 	? 'url(' . json_encode($initialMaskCard['media_url'], JSON_UNESCAPED_SLASHES) . ')'
 	: 'none';
 
-$createBlogHref = '/';
-$lastBlogWord = strtolower(trim((string) ($_SESSION['fbo_last_blog_word'] ?? '')));
-if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) === 1) {
-	$createBlogHref = '/blog/' . rawurlencode($lastBlogWord);
-}
-
 $gridCards = $cards;
 $gridCardCount = count($gridCards);
 $blogCount = count($blogs);
 ?>
+
+<!--
+ __  __       ____  
+|  \/  |     / ___| 
+| \  / |    | | __  
+| |\/| |    | |(  | 
+| |  | |  _ | |_) |  _ 
+(_)  (_) (_) \____| (_)
+moritzgauss.com | @piquedeux | github.com/piquedeux
+-->
 <!doctype html>
 <html lang="de">
 
@@ -182,15 +266,15 @@ $blogCount = count($blogs);
 <body class="shuffleboard-page">
 	<header class="hero">
 		<div class="hero-head">
-			<a href="/" class="logo logo-link"><span class="fbo-title-mark-black">FBO</span> Shuffleboard</a>
+			<a href="/" class="logo logo-link"><span class="fbo-title-mark-black">FBO</span>Shuffleboard</a>
 			<div class="hero-right">
 				<div class="hero-actions">
-					<a href="/login" class="ui-btn">create blog</a>
+					<a href="/create" class="ui-btn">create blog</a>
 					<a href="/fbo/fbo" class="ui-btn shuffle-info-btn" aria-label="About FBO" title="FBO info">i</a>
 				</div>
 			</div>
 		</div>
-		<div class="subtitle-line">Image posts by blogs on FBO.</div>
+		<div class="subtitle-line">Fuck Being Online.</div>
 	</header>
 
 	<nav class="topbar shuffleboard-topbar">
@@ -204,7 +288,6 @@ $blogCount = count($blogs);
 		</div>
 		<div class="shuffleboard-topbar-meta">
 			<span class="meta"><?= $gridCardCount ?> posts in shuffle</span>
-			<span class="meta"><?= $blogCount ?> blogs created</span>
 		</div>
 	</nav>
 
@@ -268,7 +351,9 @@ $blogCount = count($blogs);
 		</div>
 
 		<section class="shuffle-search-block" aria-labelledby="shuffleSearchLabel">
-			<label class="shuffle-search-label" id="shuffleSearchLabel" for="shuffleBlogSearch">Search blogs</label>
+<label class="shuffle-search-label" id="shuffleSearchLabel" for="shuffleBlogSearch">
+    Search blogs <span class="meta"><?= $allBlogsFinal ?></span> 
+</label>
 			<input
 				type="search"
 				id="shuffleBlogSearch"
@@ -278,6 +363,29 @@ $blogCount = count($blogs);
 				spellcheck="false"
 			>
 			<div class="shuffle-search-preview" id="shuffleSearchPreview"></div>
+		</section>
+
+		<section class="shuffle-blog-directory" aria-labelledby="shuffleBlogDirectoryLabel">
+			<div class="shuffle-blog-directory-head">
+				<div>
+					<h2 class="shuffle-blog-directory-title" id="shuffleBlogDirectoryLabel">Browse the network</h2>
+				</div>
+			</div>
+			<div class="shuffle-blog-directory-grid">
+				<?php foreach ($blogs as $blog): ?>
+					<div class="shuffle-blog-card" data-blog-word="<?= htmlspecialchars((string) ($blog['word'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+						<a class="shuffle-blog-card-link" href="<?= htmlspecialchars((string) $blog['url'], ENT_QUOTES, 'UTF-8') ?>">
+							<div class="shuffle-blog-card-name"><?= htmlspecialchars((string) $blog['name'], ENT_QUOTES, 'UTF-8') ?></div>
+							<div class="shuffle-blog-card-meta"><?= htmlspecialchars((string) ($blog['media_types_display'] ?? 'mixed'), ENT_QUOTES, 'UTF-8') ?> • <?= htmlspecialchars((string) ($blog['post_count_display'] ?? ((string) ((int) ($blog['post_count'] ?? 0)) . ' posts')), ENT_QUOTES, 'UTF-8') ?></div>
+							<div class="shuffle-blog-card-meta">created <?= htmlspecialchars((string) ($blog['created_at_display'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
+						</a>
+						<div class="shuffle-blog-card-actions">
+							<button type="button" class="shuffle-blog-favorite-btn ui-btn" data-blog-word="<?= htmlspecialchars((string) ($blog['word'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" aria-pressed="false">favorite</button>
+							<button type="button" class="shuffle-blog-preview-btn ui-btn" data-fullurl="<?= htmlspecialchars((string) ($blog['fullUrl'] ?? $blog['url']), ENT_QUOTES, 'UTF-8') ?>" aria-label="Quick view <?= htmlspecialchars((string) $blog['name'], ENT_QUOTES, 'UTF-8') ?>">quickview</button>
+						</div>
+					</div>
+				<?php endforeach; ?>
+			</div>
 		</section>
 	</main>
 

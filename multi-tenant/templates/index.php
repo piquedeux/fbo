@@ -15,6 +15,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['create_blo
 		$error = 'Blog name and password are required.';
 	} elseif (!preg_match('/^[A-Za-z0-9_-]+$/', $blogInput)) {
 		$error = 'Use letters, numbers, - or _ only.';
+	} elseif (mt_is_reserved_blog_word($blogInput)) {
+		$error = 'That blog name is reserved.';
 	} elseif (mb_strlen($password) < 6) {
 		$error = 'Password must be at least 6 characters.';
 	} else {

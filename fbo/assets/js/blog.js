@@ -40,12 +40,15 @@
     return;
 
   const imageExt = new Set(["jpg", "jpeg", "png", "webp", "gif"]);
+  const audioExt = new Set(["mp3", "wav", "flac", "ogg", "oga", "m4a", "aac"]);
   const videoExt = new Set(["mp4", "mov", "webm", "m4v"]);
   const captionCharLimit = 67;
   const maxImagesPerUpload = 10;
   const maxImageSizeBytes = 10 * 1024 * 1024;
+  const maxAudioSizeBytes = 100 * 1024 * 1024;
+  const maxVideoBatchSizeBytes = 100 * 1024 * 1024;
   const maxVideoSizeBytes = 300 * 1024 * 1024;
-  const defaultStatus = "Select only images or one video per upload.";
+  const defaultStatus = "Select images, audio, or one video per upload.";
   let selectedFiles = [];
   let captions = [];
   let useFilenameCaption = [];
@@ -111,10 +114,11 @@
       return "image";
     }
 
+    if (mime.startsWith("audio/") || audioExt.has(ext)) {
+      return "audio";
+    }
+
     if (mime.startsWith("video/") || videoExt.has(ext)) {
-      if (ext === "webm" && mime.startsWith("audio/")) {
-        return null;
-      }
       return "video";
     }
 
@@ -133,18 +137,38 @@
       return;
     }
 
-    const videoCount = selectedFiles.reduce(
-      (count, file) => count + (classifyFile(file) === "video" ? 1 : 0),
-      0,
+    const counts = selectedFiles.reduce(
+      (state, file) => {
+        const kind = classifyFile(file);
+        if (kind && state[kind] !== undefined) {
+          state[kind] += 1;
+        }
+        return state;
+      },
+      { image: 0, audio: 0, video: 0 },
     );
-    const imageCount = selectedFiles.length - videoCount;
 
-    if (videoCount === 1 && imageCount === 0) {
+    if (counts.video === 1 && counts.image === 0 && counts.audio === 0) {
       counter.textContent = "1 video selected.";
       return;
     }
 
-    counter.textContent = `${imageCount} / ${maxImagesPerUpload} images selected.`;
+    if (counts.audio === 1 && counts.image === 0 && counts.video === 0) {
+      counter.textContent = "1 audio file selected.";
+      return;
+    }
+
+    const parts = [];
+    if (counts.image > 0) {
+      parts.push(`${counts.image} image${counts.image === 1 ? "" : "s"}`);
+    }
+    if (counts.audio > 0) {
+      parts.push(`${counts.audio} audio file${counts.audio === 1 ? "" : "s"}`);
+    }
+    if (counts.video > 0) {
+      parts.push(`${counts.video} video${counts.video === 1 ? "" : "s"}`);
+    }
+    counter.textContent = parts.join(", ");
   };
 
   const syncInputFiles = () => {
@@ -237,6 +261,14 @@
 
         mediaWrap.appendChild(video);
         mediaWrap.appendChild(videoTrigger);
+      } else if (mime.startsWith("audio/") || audioExt.has(ext)) {
+        const audio = document.createElement("audio");
+        audio.src = url;
+        audio.controls = true;
+        audio.preload = "metadata";
+        audio.setAttribute("aria-label", file.name);
+        mediaWrap.classList.add("upload-audio-preview");
+        mediaWrap.appendChild(audio);
       } else if (mime.startsWith("image/") || imageExt.has(ext)) {
         const img = document.createElement("img");
         img.src = url;
@@ -359,8 +391,13 @@
   input.addEventListener("change", () => {
     const files = Array.from(input.files || []);
     const images = [];
+    const audios = [];
     const videos = [];
     const rejected = [];
+    const hasVideoSelection = files.some(
+      (file) => classifyFile(file) === "video",
+    );
+    const batchVideoLimit = hasVideoSelection && files.length > 1;
 
     setStatus(defaultStatus, false);
 
@@ -384,8 +421,20 @@
         return;
       }
 
+      if (kind === "audio") {
+        if (file.size > maxAudioSizeBytes) {
+          rejected.push(file.name);
+          return;
+        }
+        audios.push(file);
+        return;
+      }
+
       if (kind === "video") {
-        if (file.size > maxVideoSizeBytes) {
+        if (
+          file.size >
+          (batchVideoLimit ? maxVideoBatchSizeBytes : maxVideoSizeBytes)
+        ) {
           rejected.push(file.name);
           return;
         }
@@ -396,7 +445,7 @@
       rejected.push(file.name);
     });
 
-    if (images.length === 0 && videos.length === 0) {
+    if (images.length === 0 && audios.length === 0 && videos.length === 0) {
       selectedFiles = [];
       captions = [];
       useFilenameCaption = [];
@@ -404,48 +453,25 @@
       render();
       setStatus(
         rejected.length > 0
-          ? "No valid images or videos selected."
+          ? "No valid images, audio, or videos selected."
           : defaultStatus,
         rejected.length > 0,
       );
       return;
     }
 
-    if (images.length > 0 && videos.length > 0) {
+    if (videos.length > 1) {
       selectedFiles = [];
       captions = [];
       useFilenameCaption = [];
       syncInputFiles();
       render();
-      setStatus("Select either images or one video per upload.", true);
-      return;
-    }
-
-    if (videos.length > 0) {
-      selectedFiles = [videos[0]];
-      captions = selectedFiles.map(() => "");
-      useFilenameCaption = selectedFiles.map(() => false);
-      syncInputFiles();
-      render();
-
-      if (videos.length > 1) {
-        setStatus(
-          "Only one video can be uploaded at a time. Keeping the first video.",
-          false,
-        );
-      } else if (rejected.length > 0) {
-        setStatus(
-          "Ignored unsupported or oversized files. Only the video limit applies.",
-          false,
-        );
-      } else {
-        setStatus(defaultStatus, false);
-      }
+      setStatus("Only one video can be uploaded at a time.", true);
       return;
     }
 
     const trimmedImages = images.slice(0, maxImagesPerUpload);
-    selectedFiles = trimmedImages;
+    selectedFiles = [...trimmedImages, ...audios, ...videos];
     captions = selectedFiles.map(() => "");
     useFilenameCaption = selectedFiles.map(() => false);
     render();

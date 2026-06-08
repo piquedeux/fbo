@@ -44,15 +44,21 @@
     heroActions.insertBefore(videoBtn, heroActions.firstChild);
     heroActions.insertBefore(recordBtn, heroActions.firstChild);
 
-    const allowedExt = new Set(
-      String(document.body?.dataset?.mediaExtensions || "")
-        .split(",")
-        .map((value) => value.trim().toLowerCase())
-        .filter(Boolean),
-    );
-    const maxUploadBytes = Number(
-      document.body?.dataset?.maxUploadFileSizeBytes || "104857600",
-    );
+    const imageExt = new Set(["jpg", "jpeg", "png", "webp", "gif"]);
+    const audioExt = new Set([
+      "mp3",
+      "wav",
+      "flac",
+      "ogg",
+      "oga",
+      "m4a",
+      "aac",
+    ]);
+    const videoExt = new Set(["mp4", "mov", "webm", "m4v"]);
+    const maxImageBytes = 10 * 1024 * 1024;
+    const maxAudioBytes = 100 * 1024 * 1024;
+    const maxVideoBatchBytes = 100 * 1024 * 1024;
+    const maxVideoSingleBytes = 300 * 1024 * 1024;
 
     const extFromName = (name) =>
       (
@@ -60,16 +66,38 @@
           .split(".")
           .pop() || ""
       ).toLowerCase();
-    const isAllowedFile = (file) => {
+    const classifyFile = (file) => {
       const ext = extFromName(file.name);
-      if (!ext || (allowedExt.size > 0 && !allowedExt.has(ext))) return false;
-      if (
-        Number.isFinite(maxUploadBytes) &&
-        maxUploadBytes > 0 &&
-        file.size > maxUploadBytes
-      )
-        return false;
-      return true;
+      const mime = String(file.type || "").toLowerCase();
+
+      if (mime.startsWith("image/") || imageExt.has(ext)) return "image";
+      if (mime.startsWith("audio/") || audioExt.has(ext)) return "audio";
+      if (mime.startsWith("video/") || videoExt.has(ext)) return "video";
+      return null;
+    };
+
+    const isAllowedFile = (file) => {
+      const kind = classifyFile(file);
+      if (!kind) return false;
+
+      if (kind === "image") {
+        return file.size > 0 && file.size <= maxImageBytes;
+      }
+
+      if (kind === "audio") {
+        return file.size > 0 && file.size <= maxAudioBytes;
+      }
+
+      if (kind === "video") {
+        const existingFiles = Array.from(input.files || []);
+        const batchVideoLimit = existingFiles.length > 0;
+        const sizeLimit = batchVideoLimit
+          ? maxVideoBatchBytes
+          : maxVideoSingleBytes;
+        return file.size > 0 && file.size <= sizeLimit;
+      }
+
+      return false;
     };
 
     // helper to add File to input.files via DataTransfer

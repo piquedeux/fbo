@@ -18,6 +18,11 @@ function mt_normalize_blog_word(string $value): string
     return strtolower(mb_substr($blog, 0, 24));
 }
 
+function mt_is_reserved_blog_word(string $blogWord): bool
+{
+    return mt_normalize_blog_word($blogWord) === 'moritz';
+}
+
 /**
  * Creates the blog data directory (backend, media, uploads) and registers in DB.
  * The central fbo/ code is NOT copied — loaded directly by bootstrap.php.
@@ -29,6 +34,10 @@ function mt_provision_blog(string $blogWord, string $password = ''): array
     $blog = mt_normalize_blog_word($blogWord);
     if ($blog === '') {
         return ['ok' => false, 'message' => 'Invalid blog name.'];
+    }
+
+    if (mt_is_reserved_blog_word($blog)) {
+        return ['ok' => false, 'message' => 'That blog name is reserved.'];
     }
 
     require_once __DIR__ . '/db.php';

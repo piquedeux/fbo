@@ -61,7 +61,7 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 
 		.fbo-page-wrap {
 			display: grid;
-			grid-template-columns: 280px 1fr;
+			grid-template-columns: 1fr;
 			height: calc(100vh - var(--fbo-header-h));
 		}
 
@@ -75,16 +75,6 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 			white-space: nowrap;
 			text-decoration: none;
 			color: inherit;
-		}
-
-
-		.fbo-index-col {
-			border-right: 2px solid var(--line);
-			padding: 14px 12px;
-			display: flex;
-			flex-direction: column;
-			gap: 10px;
-			overflow-y: auto;
 		}
 
 
@@ -224,16 +214,9 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 			color: var(--fg);
 		}
 
-				@media (max-width: 700px) {
+		@media (max-width: 700px) {
 			.fbo-page-wrap {
-				grid-template-columns: 1fr;
 				height: auto;
-			}
-
-			.fbo-index-col {
-				border-right: none;
-				border-bottom: 2px solid var(--line);
-				overflow-y: visible;
 			}
 
 			.fbo-info-col {
@@ -254,7 +237,7 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 			<a href="#" onclick="history.back(); return false;" class="project-title"><span class="fbo-highlighted"><span class="fbo-highlighted-ghost" aria-hidden="true">FBO</span><span class="fbo-highlighted-text" aria-hidden="true"><span>F</span><span>B</span><span>O</span></span><span class="sr-only">FBO</span></span> Project<sup>beta</sup></a>
 			<div class="hero-right">
 				<div class="hero-actions">
-					<a href="<?= htmlspecialchars($createBlogHref, ENT_QUOTES, 'UTF-8') ?>" class="ui-btn">Create blog</a>
+					<a href="/create" class="ui-btn">Create blog</a>
 					<a href="https://www.instagram.com/fbeing.online" target="_blank" rel="noopener noreferrer"
 						class="text-link">IG</a>
 					<a href="mailto:fboproject@proton.me" class="text-link">M</a>
@@ -265,44 +248,6 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 	</header>
 
 	<div class="fbo-page-wrap" id="fboPageWrap">
-
-		<aside class="fbo-index-col">
-			<p class="fbo-index-heading">Blogs <?php if ($blogs !== []): ?><span class="fbo-count" id="fboCount">(<?= count($blogs) ?>)</span><?php endif; ?></p>
-
-			<input type="search" class="fbo-search" id="fboSearch" placeholder="Search by name or URL…" autocomplete="off" spellcheck="false">
-
-			<?php if ($blogs === []): ?>
-				<p class="fbo-count">No blogs yet.</p>
-			<?php else: ?>
-				<div class="fbo-blog-list" id="fboBlogList">
-					<?php foreach ($blogs as $blog):
-						$word = (string) ($blog['blog_word'] ?? '');
-						$date = (string) ($blog['created_at'] ?? '');
-						$customUrl = (string) ($blog['custom_url'] ?? '');
-						$url = $customUrl !== '' ? $customUrl : '/blog/' . rawurlencode($word);
-						$fullUrl = preg_match('/^https?:\/\//i', $url) ? $url : ($scheme . '://' . $host . $url);
-						$safeWord = htmlspecialchars($word, ENT_QUOTES, 'UTF-8');
-						$safeUrl = htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
-						$safeFullUrl = htmlspecialchars($fullUrl, ENT_QUOTES, 'UTF-8');
-						$formattedDate = fbo_format_date($date);
-						$safeDate = htmlspecialchars($formattedDate, ENT_QUOTES, 'UTF-8');
-						?>
-						<div class="fbo-blog-item" data-word="<?= $safeWord ?>" data-url="<?= $safeUrl ?>" data-fullurl="<?= $safeFullUrl ?>">
-							<a href="<?= $safeUrl ?>">/blog/<?= $safeWord ?></a>
-							<?php if ($formattedDate !== ''): ?>
-								<span class="fbo-blog-date"><?= $safeDate ?></span>
-							<?php endif; ?>
-						</div>
-					<?php endforeach; ?>
-				</div>
-
-				<p class="fbo-no-results" id="fboNoResults">No blogs match your search.</p>
-
-				<div class="fbo-load-more-wrap" id="fboLoadMoreWrap">
-					<button class="ui-btn" id="fboLoadMore">Load more</button>
-				</div>
-			<?php endif; ?>
-		</aside>
 
 		<div class="fbo-info-col">
 			<main class="archive single" id="idea">
@@ -359,91 +304,6 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 	</div>
 
 	<script src="<?= local_asset_url('assets/js/script.js') ?>" defer></script>
-	<script>
-		(function () {
-			var MOBILE_BREAKPOINT = 700;
-			var PAGE_SIZE = 20;
-
-			function setHeaderVar() {
-				var h = document.getElementById('fboHeader');
-				var wrap = document.getElementById('fboPageWrap');
-				if (h && wrap) {
-					document.documentElement.style.setProperty('--fbo-header-h', h.offsetHeight + 'px');
-				}
-			}
-			setHeaderVar();
-			window.addEventListener('resize', setHeaderVar);
-
-			var search = document.getElementById('fboSearch');
-			var list = document.getElementById('fboBlogList');
-			var noResult = document.getElementById('fboNoResults');
-			var loadWrap = document.getElementById('fboLoadMoreWrap');
-			var loadBtn = document.getElementById('fboLoadMore');
-			var countEl = document.getElementById('fboCount');
-
-			if (!list) return;
-
-			var allItems = Array.from(list.querySelectorAll('.fbo-blog-item'));
-			var visibleEnd = PAGE_SIZE;
-			var currentQuery = '';
-
-			function isMobile() { return window.innerWidth <= MOBILE_BREAKPOINT; }
-
-			function applyState() {
-				var q = currentQuery.toLowerCase().trim();
-				var matched = [];
-
-				allItems.forEach(function (item) {
-					var fits =
-						q === '' ||
-						(item.dataset.word || '').toLowerCase().indexOf(q) !== -1 ||
-						(item.dataset.url || '').toLowerCase().indexOf(q) !== -1 ||
-						(item.dataset.fullurl || '').toLowerCase().indexOf(q) !== -1;
-					if (fits) matched.push(item);
-				});
-
-				allItems.forEach(function (item) {
-					var idx = matched.indexOf(item);
-					if (idx === -1) { item.hidden = true; return; }
-					item.hidden = (!isMobile() || q !== '') ? false : idx >= visibleEnd;
-				});
-
-				if (noResult) noResult.style.display = (q !== '' && matched.length === 0) ? '' : 'none';
-
-				if (loadWrap) loadWrap.style.display = (isMobile() && q === '' && matched.length > visibleEnd) ? '' : 'none';
-
-				if (countEl) {
-					var shown = matched.filter(function (i) { return !i.hidden; }).length;
-					var isCappedAtTwenty = isMobile() && q === '' && visibleEnd === PAGE_SIZE && matched.length > visibleEnd;
-					if (q !== '') {
-						countEl.textContent = '(' + shown + '/' + allItems.length + ')';
-					} else {
-						countEl.textContent = (isMobile()
-							? '(' + shown + '/' + allItems.length + ')'
-							: '(' + allItems.length + ')') + (isCappedAtTwenty ? ' search for more' : '');
-					}
-				}
-			}
-
-			if (search) {
-				search.addEventListener('input', function () {
-					currentQuery = search.value;
-					visibleEnd = PAGE_SIZE;
-					applyState();
-				});
-			}
-
-			if (loadBtn) {
-				loadBtn.addEventListener('click', function () {
-					visibleEnd += PAGE_SIZE;
-					applyState();
-				});
-			}
-
-			window.addEventListener('resize', applyState);
-			applyState();
-		})();
-	</script>
 </body>
 
 </html>

@@ -40,10 +40,13 @@ session_start();
 const MAX_TEXT_POST_LENGTH = 280;
 const MAX_IMAGE_UPLOAD_FILE_SIZE_BYTES = 10485760;
 const MAX_IMAGE_UPLOAD_FILES_PER_REQUEST = 10;
+const MAX_AUDIO_UPLOAD_FILE_SIZE_BYTES = 104857600;
+const MAX_VIDEO_BATCH_UPLOAD_FILE_SIZE_BYTES = 104857600;
 const MAX_VIDEO_UPLOAD_FILE_SIZE_BYTES = 314572800;
 const MAX_VIDEO_UPLOAD_FILES_PER_REQUEST = 1;
-const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
-const VIDEO_EXTENSIONS = ['mp4', 'mov', 'webm', 'm4v'];
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif','PNG', 'JPG', 'JPEG', 'WEBP', 'GIF'];
+const AUDIO_EXTENSIONS = ['mp3', 'wav', 'flac', 'ogg', 'oga', 'm4a', 'aac', 'MP3', 'WAV', 'FLAC', 'OGG', 'OGA', 'M4A', 'AAC'];
+const VIDEO_EXTENSIONS = ['mp4', 'mov', 'webm', 'm4v', 'avi', 'mpg', 'mpeg', 'MP4', 'MOV', 'WEBM', 'M4V', 'AVI', 'MPG', 'MPEG'];
 const MAX_MEDIA_CAPTION_LENGTH = 67;
 const BLOG_WORD_MAX_LENGTH = 24;
 const SHUFFLE_MODE_THRESHOLD = 100;
@@ -57,10 +60,11 @@ function media_upload_kind(string $extension, string $reportedMime = ''): ?strin
 		return 'image';
 	}
 
+	if (in_array($extension, AUDIO_EXTENSIONS, true) || str_starts_with($reportedMime, 'audio/')) {
+		return 'audio';
+	}
+
 	if (in_array($extension, VIDEO_EXTENSIONS, true) || str_starts_with($reportedMime, 'video/')) {
-		if ($extension === 'webm' && str_starts_with($reportedMime, 'audio/')) {
-			return null;
-		}
 		return 'video';
 	}
 
@@ -116,6 +120,75 @@ function posts_path(): string
 function captions_path(): string
 {
 	return backend_dir_path() . '/captions.json';
+}
+
+function decode_json_array(string $raw): ?array
+{
+	$decoded = json_decode($raw, true);
+	return is_array($decoded) ? $decoded : null;
+}
+
+function read_json_array_file(string $path): ?array
+{
+	if (!is_file($path)) {
+		return null;
+	}
+
+	$content = @file_get_contents($path);
+	if ($content === false) {
+		return null;
+	}
+
+	return decode_json_array($content);
+}
+
+function encode_json_payload(array $payload): ?string
+{
+	$encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+	return is_string($encoded) ? $encoded : null;
+}
+
+function write_atomic_file(string $path, string $content): bool
+{
+	$dir = dirname($path);
+	if (!is_dir($dir) && !@mkdir($dir, 0775, true) && !is_dir($dir)) {
+		return false;
+	}
+
+	$tmpPath = @tempnam($dir, '.fbo_tmp_');
+	if (!is_string($tmpPath) || $tmpPath === '') {
+		return false;
+	}
+
+	$written = @file_put_contents($tmpPath, $content);
+	if ($written === false || $written !== strlen($content)) {
+		@unlink($tmpPath);
+		return false;
+	}
+
+	if (is_file($path)) {
+		$perms = @fileperms($path);
+		if (is_int($perms) && $perms > 0) {
+			@chmod($tmpPath, $perms & 0777);
+		}
+	}
+
+	if (!@rename($tmpPath, $path)) {
+		@unlink($tmpPath);
+		return false;
+	}
+
+	return true;
+}
+
+function save_json_payload(string $path, array $payload): bool
+{
+	$encoded = encode_json_payload($payload);
+	if ($encoded === null) {
+		return false;
+	}
+
+	return write_atomic_file($path, $encoded);
 }
 
 function media_dir_path(): string
@@ -256,6 +329,17 @@ function blog_self_url(): string
 	return $scheme . '://' . $host . $path;
 }
 
+function blog_share_url(string $postId = ''): string
+{
+	$shareUrl = blog_self_url();
+	$postId = trim($postId);
+	if ($postId === '') {
+		return $shareUrl;
+	}
+
+	return $shareUrl . '?post_id=' . rawurlencode($postId);
+}
+
 function absolute_blog_asset_url(string $path): string
 {
 	$resolved = asset_url($path);
@@ -286,11 +370,7 @@ function load_settings(): array
 	];
 
 	$path = settings_path();
-	if (!is_file($path)) {
-		return $default;
-	}
-
-	$decoded = json_decode((string) file_get_contents($path), true);
+	$decoded = read_json_array_file($path);
 	if (!is_array($decoded)) {
 		return $default;
 	}
@@ -306,7 +386,7 @@ function load_settings(): array
 	];
 }
 
-function save_settings(array $settings): void
+function save_settings(array $settings): bool
 {
 	$rawEmail = trim((string) ($settings['recovery_email'] ?? ''));
 	$payload = [
@@ -315,7 +395,7 @@ function save_settings(array $settings): void
 		'recovery_email' => (filter_var($rawEmail, FILTER_VALIDATE_EMAIL) !== false) ? $rawEmail : '',
 	];
 
-	file_put_contents(settings_path(), json_encode($payload, JSON_UNESCAPED_SLASHES));
+	return save_json_payload(settings_path(), $payload);
 }
 
 function load_smtp_config(): array
@@ -637,10 +717,10 @@ function delete_multi_tenant_blog_data(string $blogWord): bool
 	return delete_directory_recursive($realBlogRoot);
 }
 
-function save_password_hash(string $password): void
+function save_password_hash(string $password): bool
 {
 	$hash = password_hash($password, PASSWORD_BCRYPT);
-	file_put_contents(auth_path(), json_encode(['password_hash' => $hash], JSON_UNESCAPED_SLASHES));
+	return save_json_payload(auth_path(), ['password_hash' => $hash]);
 }
 
 function is_valid_password_hash(string $hash): bool
@@ -652,11 +732,7 @@ function is_valid_password_hash(string $hash): bool
 function load_password_hash(): string
 {
 	$path = auth_path();
-	if (!is_file($path)) {
-		return '';
-	}
-
-	$decoded = json_decode((string) file_get_contents($path), true);
+	$decoded = read_json_array_file($path);
 	if (!is_array($decoded)) {
 		return '';
 	}
@@ -668,11 +744,7 @@ function load_password_hash(): string
 function load_otp(): ?array
 {
 	$path = otp_path();
-	if (!is_file($path)) {
-		return null;
-	}
-
-	$decoded = json_decode((string) file_get_contents($path), true);
+	$decoded = read_json_array_file($path);
 	if (!is_array($decoded)) {
 		return null;
 	}
@@ -1029,11 +1101,7 @@ function resolve_media_caption(string $rawCaption, string $filename, bool $allow
 function load_captions(): array
 {
 	$path = captions_path();
-	if (!is_file($path)) {
-		return [];
-	}
-
-	$decoded = json_decode((string) file_get_contents($path), true);
+	$decoded = read_json_array_file($path);
 	if (!is_array($decoded)) {
 		return [];
 	}
@@ -1061,7 +1129,7 @@ function load_captions(): array
 	return $result;
 }
 
-function save_captions(array $captions): void
+function save_captions(array $captions): bool
 {
 	$normalized = [];
 	foreach ($captions as $postId => $caption) {
@@ -1077,7 +1145,7 @@ function save_captions(array $captions): void
 	}
 
 	$payload = ['items' => $normalized];
-	file_put_contents(captions_path(), json_encode($payload, JSON_UNESCAPED_SLASHES));
+	return save_json_payload(captions_path(), $payload);
 }
 
 function safe_realpath_within(string $path, string $basePath): ?string
@@ -1118,11 +1186,7 @@ function resolve_local_media_path_for_delete(string $relativePath): ?string
 function load_posts(): array
 {
 	$path = posts_path();
-	if (!is_file($path)) {
-		return [];
-	}
-
-	$decoded = json_decode((string) file_get_contents($path), true);
+	$decoded = read_json_array_file($path);
 	if (!is_array($decoded)) {
 		return [];
 	}
@@ -1149,10 +1213,10 @@ function load_posts(): array
 	return $result;
 }
 
-function save_posts(array $posts): void
+function save_posts(array $posts): bool
 {
 	$payload = ['items' => array_values($posts)];
-	file_put_contents(posts_path(), json_encode($payload, JSON_UNESCAPED_SLASHES));
+	return save_json_payload(posts_path(), $payload);
 }
 
 function linkify_text_post_content(string $text): string
@@ -1188,6 +1252,25 @@ function linkify_text_post_content(string $text): string
 	}
 
 	return nl2br($linked);
+}
+
+function normalize_social_preview_text(string $text, int $limit): string
+{
+	$text = html_entity_decode(strip_tags($text), ENT_QUOTES, 'UTF-8');
+	$text = preg_replace('/\s+/u', ' ', trim($text)) ?? '';
+	if ($text === '') {
+		return '';
+	}
+
+	if ($limit <= 0 || mb_strlen($text) <= $limit) {
+		return $text;
+	}
+
+	if ($limit <= 3) {
+		return mb_substr($text, 0, $limit);
+	}
+
+	return rtrim(mb_substr($text, 0, $limit - 3)) . '...';
 }
 
 function set_flash_message(string $message): void
@@ -1288,11 +1371,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['generate_o
 	}
 	$otp = strtoupper(bin2hex(random_bytes(4)));
 	$hash = password_hash($otp, PASSWORD_BCRYPT);
-	$written = file_put_contents(
-		otp_path(),
-		json_encode(['hash' => $hash, 'expires' => time() + 900], JSON_UNESCAPED_SLASHES)
-	);
-	if ($written === false) {
+	$written = save_json_payload(otp_path(), ['hash' => $hash, 'expires' => time() + 900]);
+	if (!$written) {
 		set_flash_message('Could not create one-time password. Please check write permissions.');
 		header('Location: ?' . $blogQ . 'edit=1');
 		exit;
@@ -1340,7 +1420,9 @@ if (onboarding_required()) {
 		} elseif ($password !== $passwordConfirm) {
 			$onboardingError = 'Passwords do not match.';
 		} else {
-			save_password_hash($password);
+			if (!save_password_hash($password)) {
+				$onboardingError = 'Password could not be saved. Please check write permissions.';
+			} else {
 			unset($_SESSION[OTP_RESET_SESSION_KEY]);
 			$_SESSION[ADMIN_SESSION_KEY] = true;
 			if ($_blogSafe !== '') {
@@ -1349,6 +1431,7 @@ if (onboarding_required()) {
 			set_flash_message('Password updated.');
 			header('Location: ?' . $blogQ . 'edit=1');
 			exit;
+			}
 		}
 	}
 
@@ -1447,11 +1530,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['delete_blo
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['save_settings']) && $adminAuthed) {
-	save_settings([
+	if (!save_settings([
 		'site_name' => $siteName,
 		'hero_subtitle' => (string) ($_POST['hero_subtitle'] ?? $heroSubtitle),
 		'recovery_email' => $recoveryEmail,
-	]);
+	])) {
+		set_flash_message('Settings could not be saved. Please check write permissions.');
+		header('Location: ?' . $blogQ . 'edit=1');
+		exit;
+	}
 	set_flash_message('Settings saved.');
 	header('Location: ?' . $blogQ . 'edit=1');
 	exit;
@@ -1464,11 +1551,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['save_recov
 		header('Location: ?' . $blogQ . 'edit=1');
 		exit;
 	}
-	save_settings([
+	if (!save_settings([
 		'site_name' => $siteName,
 		'hero_subtitle' => $heroSubtitle,
 		'recovery_email' => $_newEmail,
-	]);
+	])) {
+		set_flash_message('Recovery email could not be saved. Please check write permissions.');
+		header('Location: ?' . $blogQ . 'edit=1');
+		exit;
+	}
 	set_flash_message($_newEmail === '' ? 'Recovery email removed.' : 'Recovery email saved.');
 	header('Location: ?' . $blogQ . 'edit=1');
 	exit;
@@ -1491,7 +1582,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['create_tex
 		'pinned' => false,
 		'timestamp' => time(),
 	]);
-	save_posts($posts);
+	if (!save_posts($posts)) {
+		set_flash_message('Post could not be saved. Please try again.');
+		header('Location: ?' . $blogQ . 'compose=1');
+		exit;
+	}
 	$newCount = $previousCount + 1;
 	if ($previousCount < SHUFFLE_MODE_THRESHOLD && $newCount >= SHUFFLE_MODE_THRESHOLD) {
 		set_shuffle_activation_celebration();
@@ -1534,6 +1629,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 		$count = count($files['name']);
 		$imageCount = 0;
 		$videoCount = 0;
+		$audioCount = 0;
 		for ($index = 0; $index < $count; $index++) {
 			$err = (int) ($files['error'][$index] ?? UPLOAD_ERR_NO_FILE);
 			if ($err !== UPLOAD_ERR_OK) {
@@ -1547,13 +1643,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 				$imageCount++;
 			} elseif ($kind === 'video') {
 				$videoCount++;
+			} elseif ($kind === 'audio') {
+				$audioCount++;
 			}
-		}
-
-		if ($imageCount > 0 && $videoCount > 0) {
-			set_flash_message('Upload limit: select either up to ' . MAX_IMAGE_UPLOAD_FILES_PER_REQUEST . ' images or 1 video per upload.');
-			header('Location: ?' . $blogQ . 'compose=1');
-			exit;
 		}
 
 		if ($videoCount > MAX_VIDEO_UPLOAD_FILES_PER_REQUEST) {
@@ -1581,7 +1673,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 				continue;
 			}
 
-			$sizeLimit = $kind === 'video' ? MAX_VIDEO_UPLOAD_FILE_SIZE_BYTES : MAX_IMAGE_UPLOAD_FILE_SIZE_BYTES;
+			if ($kind === 'video') {
+				$sizeLimit = ($count === 1 && $videoCount === 1)
+					? MAX_VIDEO_UPLOAD_FILE_SIZE_BYTES
+					: MAX_VIDEO_BATCH_UPLOAD_FILE_SIZE_BYTES;
+			} elseif ($kind === 'audio') {
+				$sizeLimit = MAX_AUDIO_UPLOAD_FILE_SIZE_BYTES;
+			} else {
+				$sizeLimit = MAX_IMAGE_UPLOAD_FILE_SIZE_BYTES;
+			}
 			if ($size <= 0 || $size > $sizeLimit) {
 				$failed++;
 				continue;
@@ -1659,13 +1759,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 	if ($saved > 0) {
 		$posts = load_posts();
 		$previousCount = count($posts);
-		save_posts(array_merge($newPosts, $posts));
+		if (!save_posts(array_merge($newPosts, $posts))) {
+			set_flash_message('Uploaded files were stored, but posts could not be saved. Please try again.');
+			header('Location: ?' . $blogQ . 'compose=1');
+			exit;
+		}
 		if ($newCaptions !== []) {
 			$captions = load_captions();
 			foreach ($newCaptions as $postId => $caption) {
 				$captions[$postId] = $caption;
 			}
-			save_captions($captions);
+			if (!save_captions($captions)) {
+				set_flash_message('Posts saved, but captions could not be saved. Please try again.');
+				header('Location: ?' . $blogQ . 'compose=1');
+				exit;
+			}
 		}
 		$newCount = $previousCount + count($newPosts);
 		if ($previousCount < SHUFFLE_MODE_THRESHOLD && $newCount >= SHUFFLE_MODE_THRESHOLD) {
@@ -1675,7 +1783,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 
 	$message = 'Uploaded: ' . $saved;
 	if ($failed > 0) {
-		$message .= ' | Failed: ' . $failed . ' (limit: 10MB images, 300MB videos)';
+		$message .= ' | Failed: ' . $failed . ' (limit: 10MB images, 100MB audio, 100MB batch videos, 300MB single videos)';
 	}
 	set_flash_message($message);
 	header('Location: ?' . $blogQ . 'compose=1');
@@ -1722,7 +1830,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (isset($_POST['delete_pa
 		$deletedPostIds[] = $postId;
 	}
 
-	save_posts($nextPosts);
+	if (!save_posts($nextPosts)) {
+		set_flash_message('Delete could not be saved. Please try again.');
+		header('Location: ?' . $blogQ . 'compose=1&view=' . rawurlencode($view) . '&page=' . rawurlencode((string) $page));
+		exit;
+	}
 	if ($deletedPostIds !== []) {
 		$captions = load_captions();
 		$changed = false;
@@ -1733,7 +1845,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (isset($_POST['delete_pa
 			}
 		}
 		if ($changed) {
-			save_captions($captions);
+			if (!save_captions($captions)) {
+				set_flash_message('Posts deleted, but captions cleanup failed. Please retry.');
+				header('Location: ?' . $blogQ . 'compose=1&view=' . rawurlencode($view) . '&page=' . rawurlencode((string) $page));
+				exit;
+			}
 		}
 	}
 
@@ -1766,11 +1882,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['delete_pos
 		break;
 	}
 	$posts = array_values(array_filter($posts, static fn(array $p): bool => (string) ($p['id'] ?? '') !== $postId));
-	save_posts($posts);
+	if (!save_posts($posts)) {
+		set_flash_message('Post could not be deleted. Please try again.');
+		header('Location: ?' . $blogQ . 'compose=1');
+		exit;
+	}
 	$captions = load_captions();
 	if (isset($captions[$postId])) {
 		unset($captions[$postId]);
-		save_captions($captions);
+		if (!save_captions($captions)) {
+			set_flash_message('Post deleted, but caption cleanup failed. Please retry.');
+			header('Location: ?' . $blogQ . 'compose=1');
+			exit;
+		}
 	}
 	if ($deleteMediaPath !== '') {
 		$target = resolve_local_media_path_for_delete($deleteMediaPath);
@@ -1828,7 +1952,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['pin_post']
 	}
 	unset($post);
 	if ($updated) {
-		save_posts($posts);
+		if (!save_posts($posts)) {
+			set_flash_message('Could not update pin state. Please try again.');
+			header('Location: ?' . $blogQ . 'compose=1');
+			exit;
+		}
 		set_flash_message('Post pinned. ' . pinned_media_summary($posts));
 	}
 	header('Location: ?' . $blogQ . 'compose=1');
@@ -1849,7 +1977,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['unpin_post
 	}
 	unset($post);
 	if ($updated) {
-		save_posts($posts);
+		if (!save_posts($posts)) {
+			set_flash_message('Could not update pin state. Please try again.');
+			header('Location: ?' . $blogQ . 'compose=1');
+			exit;
+		}
 		set_flash_message('Post unpinned. ' . pinned_media_summary($posts));
 	}
 	header('Location: ?' . $blogQ . 'compose=1');
@@ -1880,7 +2012,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['enable_shu
 		exit;
 	}
 	if ($updated) {
-		save_posts($posts);
+		if (!save_posts($posts)) {
+			set_flash_message('Could not update shuffleboard status. Please try again.');
+			header('Location: ?' . $blogQ . 'compose=1');
+			exit;
+		}
 		set_flash_message('Post added to FBO Shuffleboard.');
 	}
 	header('Location: ?' . $blogQ . 'compose=1');
@@ -1911,7 +2047,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['disable_sh
 		exit;
 	}
 	if ($updated) {
-		save_posts($posts);
+		if (!save_posts($posts)) {
+			set_flash_message('Could not update shuffleboard status. Please try again.');
+			header('Location: ?' . $blogQ . 'compose=1');
+			exit;
+		}
 		set_flash_message('Post removed from FBO Shuffleboard.');
 	}
 	header('Location: ?' . $blogQ . 'compose=1');
@@ -1995,7 +2135,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && isset($_GET['download_bac
 
 $posts = load_posts();
 $captions = load_captions();
-$canonicalUrl = blog_self_url();
 $allPostsCount = count($posts);
 $singlePostMode = false;
 if ($requestedPostId !== '' && !$composeMode) {
@@ -2013,15 +2152,31 @@ if ($requestedPostId !== '' && !$composeMode) {
 }
 
 $sharePreviewImageUrl = absolute_blog_asset_url('assets/icon/heart-icon.png');
+$sharePreviewTitle = $siteNameDisplay;
+$sharePreviewDescription = 'A blogging tool for people tired of platforms. Open source. No ads. No app. No ai.';
+$shareUrl = blog_self_url();
 $ogType = 'website';
 $twitterCardType = 'summary';
 if ($singlePostMode) {
 	$ogType = 'article';
 	$activePost = $posts[0] ?? null;
-	$activePostType = (string) ($activePost['type'] ?? '');
-	if ($activePostType === 'image') {
-		$sharePreviewImageUrl = absolute_blog_asset_url((string) ($activePost['path'] ?? ''));
-		$twitterCardType = 'summary_large_image';
+	if (is_array($activePost)) {
+		$activePostType = (string) ($activePost['type'] ?? '');
+		$activePostId = (string) ($activePost['id'] ?? '');
+		if ($activePostId !== '') {
+			$shareUrl = blog_share_url($activePostId);
+		}
+
+		if ($activePostType === 'text') {
+			$previewText = normalize_social_preview_text((string) ($activePost['text'] ?? ''), 220);
+			if ($previewText !== '') {
+				$sharePreviewTitle = normalize_social_preview_text($previewText, 70);
+				$sharePreviewDescription = $previewText;
+			}
+		} elseif ($activePostType === 'image') {
+			$sharePreviewImageUrl = absolute_blog_asset_url((string) ($activePost['path'] ?? ''));
+			$twitterCardType = 'summary_large_image';
+		}
 	}
 }
 
@@ -2097,17 +2252,17 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<meta name="description" content="A blogging tool for people tired of platforms. Open source. No ads. No app. No ai.">
+	<meta name="description" content="<?= htmlspecialchars($sharePreviewDescription, ENT_QUOTES, 'UTF-8') ?>">
 	<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
 	<meta property="og:type" content="<?= htmlspecialchars($ogType, ENT_QUOTES, 'UTF-8') ?>">
-	<meta property="og:title" content="<?= htmlspecialchars($siteNameDisplay, ENT_QUOTES, 'UTF-8') ?>">
-	<meta property="og:description" content="A blogging tool for people tired of platforms. Open source. No ads. No app. No ai.">
-	<meta property="og:url" content="<?= htmlspecialchars($canonicalUrl, ENT_QUOTES, 'UTF-8') ?>">
+	<meta property="og:title" content="<?= htmlspecialchars($sharePreviewTitle, ENT_QUOTES, 'UTF-8') ?>">
+	<meta property="og:description" content="<?= htmlspecialchars($sharePreviewDescription, ENT_QUOTES, 'UTF-8') ?>">
+	<meta property="og:url" content="<?= htmlspecialchars($shareUrl, ENT_QUOTES, 'UTF-8') ?>">
 	<meta property="og:image" content="<?= htmlspecialchars($sharePreviewImageUrl, ENT_QUOTES, 'UTF-8') ?>">
 	<meta name="twitter:card" content="<?= htmlspecialchars($twitterCardType, ENT_QUOTES, 'UTF-8') ?>">
 	<meta name="twitter:image" content="<?= htmlspecialchars($sharePreviewImageUrl, ENT_QUOTES, 'UTF-8') ?>">
-	<meta name="twitter:title" content="<?= htmlspecialchars($siteNameDisplay, ENT_QUOTES, 'UTF-8') ?>">
-	<meta name="twitter:description" content="A blogging tool for people tired of platforms. Open source. No ads. No app. No ai.">
+	<meta name="twitter:title" content="<?= htmlspecialchars($sharePreviewTitle, ENT_QUOTES, 'UTF-8') ?>">
+	<meta name="twitter:description" content="<?= htmlspecialchars($sharePreviewDescription, ENT_QUOTES, 'UTF-8') ?>">
 	<link rel="icon" type="image/png" href="<?= local_asset_url('assets/icon/icon.png') ?>">
 	<link rel="apple-touch-icon" href="<?= local_asset_url('assets/icon/heart-icon.png') ?>">
 	<link rel="manifest" href="<?= local_asset_url('fbo/manifest.json') ?>">

@@ -301,4 +301,207 @@
   }
 
   render(input ? input.value : "");
+
+  const FAVORITES_COOKIE = "fbo_shuffle_favorites";
+
+  function readCookie(name) {
+    const prefix = name + "=";
+    const parts = document.cookie ? document.cookie.split(";") : [];
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (trimmed.indexOf(prefix) === 0) {
+        return decodeURIComponent(trimmed.slice(prefix.length));
+      }
+    }
+    return "";
+  }
+
+  function writeCookie(name, value, maxAgeDays = 365) {
+    const maxAge = Math.max(1, maxAgeDays) * 24 * 60 * 60;
+    const secureFlag = window.location.protocol === "https:" ? "; secure" : "";
+    document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAge}; samesite=lax${secureFlag}`;
+  }
+
+  function readFavoriteWords() {
+    try {
+      const raw = readCookie(FAVORITES_COOKIE);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed)
+        ? parsed.map((word) => String(word || "").trim()).filter(Boolean)
+        : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function saveFavoriteWords(words) {
+    writeCookie(FAVORITES_COOKIE, JSON.stringify(words.slice(0, 100)));
+  }
+
+  function toggleFavoriteWord(word) {
+    const current = readFavoriteWords();
+    const existsIndex = current.indexOf(word);
+    if (existsIndex >= 0) {
+      current.splice(existsIndex, 1);
+      saveFavoriteWords(current);
+      return;
+    }
+
+    const next = [word, ...current.filter((item) => item !== word)];
+    saveFavoriteWords(next);
+  }
+
+  function applyFavoriteOrder() {
+    const container = document.querySelector(".shuffle-blog-directory-grid");
+    if (!container) return;
+
+    const favoriteWords = readFavoriteWords();
+    const favoriteIndex = new Map(
+      favoriteWords.map((word, index) => [word, index]),
+    );
+    const cards = Array.from(container.querySelectorAll(".shuffle-blog-card"));
+
+    cards.sort((left, right) => {
+      const leftWord = String(left.getAttribute("data-blog-word") || "").trim();
+      const rightWord = String(
+        right.getAttribute("data-blog-word") || "",
+      ).trim();
+      const leftHas = favoriteIndex.has(leftWord);
+      const rightHas = favoriteIndex.has(rightWord);
+      if (leftHas !== rightHas) return leftHas ? -1 : 1;
+      if (leftHas && rightHas)
+        return favoriteIndex.get(leftWord) - favoriteIndex.get(rightWord);
+      return 0;
+    });
+
+    cards.forEach((card) => container.appendChild(card));
+
+    cards.forEach((card) => {
+      const word = String(card.getAttribute("data-blog-word") || "").trim();
+      const favoriteBtn = card.querySelector(".shuffle-blog-favorite-btn");
+      if (!favoriteBtn) return;
+      const isFavorite = favoriteIndex.has(word);
+      favoriteBtn.classList.toggle("is-favorite", isFavorite);
+      favoriteBtn.setAttribute("aria-pressed", isFavorite ? "true" : "false");
+      favoriteBtn.textContent = isFavorite ? "favorited" : "favorite";
+    });
+  }
+
+  applyFavoriteOrder();
+
+  (function () {
+    const btns = Array.from(
+      document.querySelectorAll(".shuffle-blog-preview-btn"),
+    );
+    if (!btns.length) return;
+
+    let overlay = document.getElementById("shuffleBlogPreviewOverlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "shuffleBlogPreviewOverlay";
+      overlay.innerHTML =
+        '<div class="inner"><div class="preview-bar"><button type="button" class="preview-close-btn" aria-label="Close preview">×</button></div><iframe sandbox="" referrerpolicy="no-referrer"></iframe></div>';
+      document.body.appendChild(overlay);
+    }
+
+    const inner = overlay.querySelector(".inner");
+    const iframe = overlay.querySelector("iframe");
+    const closeBtn = overlay.querySelector(".preview-close-btn");
+
+    let blurTimer = null;
+    let closeTimer = null;
+
+    function openPreview(anchorEl, url) {
+      iframe.src = url || "";
+      overlay.classList.add("is-open");
+      overlay.style.display = "block";
+      overlay.style.pointerEvents = "none";
+
+      // timers: blur after 8s, close after 10s
+      if (blurTimer) window.clearTimeout(blurTimer);
+      if (closeTimer) window.clearTimeout(closeTimer);
+      blurTimer = window.setTimeout(() => {
+        iframe.classList.add("blurred");
+      }, 8000);
+      closeTimer = window.setTimeout(() => {
+        closePreview();
+      }, 10000);
+    }
+
+    function closePreview() {
+      overlay.classList.remove("is-open");
+      overlay.style.display = "none";
+      overlay.style.pointerEvents = "none";
+      iframe.classList.remove("blurred");
+      iframe.src = "about:blank";
+      if (blurTimer) {
+        window.clearTimeout(blurTimer);
+        blurTimer = null;
+      }
+      if (closeTimer) {
+        window.clearTimeout(closeTimer);
+        closeTimer = null;
+      }
+    }
+
+    if (closeBtn) {
+      closeBtn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        closePreview();
+      });
+    }
+
+    // close on click outside the drawer
+    document.addEventListener(
+      "click",
+      (ev) => {
+        if (!overlay || overlay.style.display !== "block") return;
+        const path = ev.composedPath ? ev.composedPath() : ev.path || [];
+        if (path.indexOf(inner) !== -1) return;
+        closePreview();
+      },
+      true,
+    );
+
+    const favoriteButtons = Array.from(
+      document.querySelectorAll(".shuffle-blog-favorite-btn"),
+    );
+
+    favoriteButtons.forEach((button) => {
+      button.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+
+        const word = String(button.getAttribute("data-blog-word") || "").trim();
+        if (!word) return;
+
+        toggleFavoriteWord(word);
+        applyFavoriteOrder();
+      });
+    });
+
+    btns.forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const url =
+          btn.getAttribute("data-preview-url") ||
+          btn.getAttribute("data-fullurl") ||
+          "";
+
+        const isOpen =
+          overlay.style.display === "block" &&
+          iframe.src &&
+          iframe.src.indexOf(url) !== -1;
+        if (isOpen) {
+          // clicking the same Quick view button closes the preview
+          closePreview();
+          return;
+        }
+
+        openPreview(btn, url);
+      });
+    });
+  })();
 })();

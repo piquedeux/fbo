@@ -15,10 +15,10 @@
         <span class="compose-section-title">Upload Media</span>
     </div>
     <form method="post" enctype="multipart/form-data" class="upload-panel" id="inlineUploadForm">
-        <input type="file" id="inlineUploadFiles" class="upload-auth-input" name="files[]" accept="image/*,video/*" multiple required>
-        <div class="upload-note upload-note-hint" id="inlineUploadHint">Images: up to 10 files, 10MB each. Videos: 1 file, 300MB.</div>
+            <input type="file" id="inlineUploadFiles" class="upload-auth-input" name="files[]" accept="image/*,video/*,audio/*" multiple required>
+            <div class="upload-note upload-note-hint" id="inlineUploadHint">Images: up to 10 files, 10MB each. Audio: 100MB each. Videos: 1 file, 300MB solo or 100MB in a batch.</div>
         <div class="upload-note upload-note-counter" id="inlineUploadCounter">No files selected yet.</div>
-        <div class="upload-note upload-note-status" id="inlineUploadStatus">Select only images or one video per upload.</div>
+            <div class="upload-note upload-note-status" id="inlineUploadStatus">Select images, audio, or one video per upload.</div>
         <label class="upload-checkbox-row" for="includeExifLocation">
             <input type="checkbox" id="includeExifLocation" name="include_exif_location" value="1">
             <span>Use photos/videos location if available</span>
