@@ -50,6 +50,8 @@ const VIDEO_EXTENSIONS = ['mp4', 'mov', 'webm', 'm4v', 'avi', 'mpg', 'mpeg', 'MP
 const MAX_MEDIA_CAPTION_LENGTH = 67;
 const BLOG_WORD_MAX_LENGTH = 24;
 const SHUFFLE_MODE_THRESHOLD = 100;
+const POSTS_SORT_ORDER = 'pinned_timestamp_desc_v1';
+const BACKUP_MEDIA_INDEX_VERSION = 1;
 
 function media_upload_kind(string $extension, string $reportedMime = ''): ?string
 {
@@ -203,25 +205,52 @@ function media_dir_path(): string
 	return $path;
 }
 
-function backup_estimate_size_bytes(): int
+function backup_media_index_path(): string
 {
-	$totalBytes = 0;
-	$paths = [
-		posts_path(),
-		captions_path(),
-		settings_path(),
-		auth_path(),
-	];
+	return backend_dir_path() . '/.backup-media-index.json';
+}
 
-	foreach ($paths as $path) {
-		if (is_file($path)) {
-			$fileSize = @filesize($path);
-			if (is_int($fileSize) && $fileSize > 0) {
-				$totalBytes += $fileSize;
-			}
-		}
+function backup_media_dir_mtime(): int
+{
+	$mediaDir = media_dir_path();
+	clearstatcache(true, $mediaDir);
+	$mtime = is_dir($mediaDir) ? @filemtime($mediaDir) : false;
+	return is_int($mtime) ? $mtime : 0;
+}
+
+function load_backup_media_index(): ?array
+{
+	$decoded = read_json_array_file(backup_media_index_path());
+	if (!is_array($decoded)) {
+		return null;
 	}
 
+	$version = (int) ($decoded['version'] ?? 0);
+	$totalBytes = (int) ($decoded['media_total_bytes'] ?? -1);
+	$mediaDirMtime = (int) ($decoded['media_dir_mtime'] ?? -1);
+	if ($version !== BACKUP_MEDIA_INDEX_VERSION || $totalBytes < 0 || $mediaDirMtime < 0) {
+		return null;
+	}
+
+	return [
+		'media_total_bytes' => $totalBytes,
+		'media_dir_mtime' => $mediaDirMtime,
+	];
+}
+
+function save_backup_media_index(int $mediaTotalBytes): bool
+{
+	return save_json_payload(backup_media_index_path(), [
+		'version' => BACKUP_MEDIA_INDEX_VERSION,
+		'media_total_bytes' => max(0, $mediaTotalBytes),
+		'media_dir_mtime' => backup_media_dir_mtime(),
+		'updated_at' => time(),
+	]);
+}
+
+function rebuild_backup_media_index(): int
+{
+	$totalBytes = 0;
 	$mediaDir = media_dir_path();
 	if (is_dir($mediaDir)) {
 		$realMedia = safe_realpath_within($mediaDir, blog_root());
@@ -241,7 +270,59 @@ function backup_estimate_size_bytes(): int
 		}
 	}
 
+	save_backup_media_index($totalBytes);
 	return $totalBytes;
+}
+
+function cached_backup_media_size_bytes(): int
+{
+	$mediaDirMtime = backup_media_dir_mtime();
+	$index = load_backup_media_index();
+	if ($index !== null && (int) $index['media_dir_mtime'] === $mediaDirMtime) {
+		return (int) $index['media_total_bytes'];
+	}
+
+	return rebuild_backup_media_index();
+}
+
+function adjust_backup_media_index_bytes(int $deltaBytes, int $expectedMediaDirMtime): void
+{
+	$index = load_backup_media_index();
+	if ($index === null || (int) $index['media_dir_mtime'] !== $expectedMediaDirMtime) {
+		rebuild_backup_media_index();
+		return;
+	}
+
+	save_backup_media_index(((int) $index['media_total_bytes']) + $deltaBytes);
+}
+
+function file_size_bytes(string $path): int
+{
+	clearstatcache(true, $path);
+	$fileSize = is_file($path) ? @filesize($path) : false;
+	return is_int($fileSize) && $fileSize > 0 ? $fileSize : 0;
+}
+
+function backup_estimate_size_bytes(): int
+{
+	$totalBytes = 0;
+	$paths = [
+		posts_path(),
+		captions_path(),
+		settings_path(),
+		auth_path(),
+	];
+
+	foreach ($paths as $path) {
+		if (is_file($path)) {
+			$fileSize = @filesize($path);
+			if (is_int($fileSize) && $fileSize > 0) {
+				$totalBytes += $fileSize;
+			}
+		}
+	}
+
+	return $totalBytes + cached_backup_media_size_bytes();
 }
 
 function asset_url(string $path): string
@@ -642,7 +723,7 @@ function delete_directory_recursive(string $dir): bool
 function delete_single_tenant_blog_data(): bool
 {
 	clear_media_files();
-	$targets = [posts_path(), captions_path(), settings_path(), auth_path(), otp_path()];
+	$targets = [posts_path(), captions_path(), settings_path(), auth_path(), otp_path(), backup_media_index_path()];
 	foreach ($targets as $target) {
 		if (is_file($target) && !@unlink($target)) {
 			return false;
@@ -1183,6 +1264,21 @@ function resolve_local_media_path_for_delete(string $relativePath): ?string
 	return $realTarget;
 }
 
+function compare_posts_for_display(array $a, array $b): int
+{
+	$pinnedCompare = ((int) !empty($b['pinned'])) <=> ((int) !empty($a['pinned']));
+	if ($pinnedCompare !== 0) {
+		return $pinnedCompare;
+	}
+	return ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
+}
+
+function sort_posts_for_display(array $posts): array
+{
+	usort($posts, 'compare_posts_for_display');
+	return array_values($posts);
+}
+
 function load_posts(): array
 {
 	$path = posts_path();
@@ -1203,19 +1299,19 @@ function load_posts(): array
 		}
 	}
 
-	usort($result, static function (array $a, array $b): int {
-		$pinnedCompare = ((int) !empty($b['pinned'])) <=> ((int) !empty($a['pinned']));
-		if ($pinnedCompare !== 0) {
-			return $pinnedCompare;
-		}
-		return ((int) ($b['timestamp'] ?? 0)) <=> ((int) ($a['timestamp'] ?? 0));
-	});
-	return $result;
+	if ((string) ($decoded['sort_order'] ?? '') !== POSTS_SORT_ORDER) {
+		return sort_posts_for_display($result);
+	}
+
+	return array_values($result);
 }
 
 function save_posts(array $posts): bool
 {
-	$payload = ['items' => array_values($posts)];
+	$payload = [
+		'sort_order' => POSTS_SORT_ORDER,
+		'items' => sort_posts_for_display(array_values($posts)),
+	];
 	return save_json_payload(posts_path(), $payload);
 }
 
@@ -1610,6 +1706,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 	$failed = 0;
 	$newPosts = [];
 	$newCaptions = [];
+	$savedMediaBytes = 0;
 	$allowShuffleboard = (string) ($_POST['allow_shuffleboard_media'] ?? '') === '1';
 	$attachExifLocation = (string) ($_POST['include_exif_location'] ?? '') === '1';
 	$instantLocationCoords = trim((string) ($_POST['instant_location_coords'] ?? ''));
@@ -1617,6 +1714,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 	$instantLocation = normalize_location_payload($instantLocationCoords, $instantLocationLabel);
 	$manualLocationApplied = false;
 	$uploadDir = media_dir_path();
+	$mediaDirMtimeBeforeUpload = backup_media_dir_mtime();
 	$clientUploadTimestamp = (int) ($_POST['upload_client_epoch'] ?? 0);
 	if ($clientUploadTimestamp > 1000000000000) {
 		$clientUploadTimestamp = (int) floor($clientUploadTimestamp / 1000);
@@ -1709,6 +1807,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 			}
 
 			@touch($targetPath, $clientUploadTimestamp, $clientUploadTimestamp);
+			$savedMediaBytes += file_size_bytes($targetPath);
 
 			$detectedMime = '';
 			if (function_exists('finfo_open')) {
@@ -1757,6 +1856,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['upload_med
 	}
 
 	if ($saved > 0) {
+		if ($savedMediaBytes > 0) {
+			adjust_backup_media_index_bytes($savedMediaBytes, $mediaDirMtimeBeforeUpload);
+		}
 		$posts = load_posts();
 		$previousCount = count($posts);
 		if (!save_posts(array_merge($newPosts, $posts))) {
@@ -1808,6 +1910,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (isset($_POST['delete_pa
 	$posts = load_posts();
 	$nextPosts = [];
 	$deletedPostIds = [];
+	$deletedMediaBytes = 0;
+	$mediaDirMtimeBeforeDelete = backup_media_dir_mtime();
 
 	foreach ($posts as $post) {
 		$postId = (string) ($post['id'] ?? '');
@@ -1819,15 +1923,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && (isset($_POST['delete_pa
 		$postType = (string) ($post['type'] ?? 'text');
 		if (in_array($postType, ['image', 'video', 'audio'], true)) {
 			$target = resolve_local_media_path_for_delete((string) ($post['path'] ?? ''));
+			$mediaBytes = $target !== null ? file_size_bytes($target) : 0;
 			if ($target === null || !@unlink($target)) {
 				$failed++;
 				$nextPosts[] = $post;
 				continue;
 			}
+			$deletedMediaBytes += $mediaBytes;
 		}
 
 		$deleted++;
 		$deletedPostIds[] = $postId;
+	}
+
+	if ($deletedMediaBytes > 0) {
+		adjust_backup_media_index_bytes(-$deletedMediaBytes, $mediaDirMtimeBeforeDelete);
 	}
 
 	if (!save_posts($nextPosts)) {
@@ -1899,7 +2009,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['delete_pos
 	if ($deleteMediaPath !== '') {
 		$target = resolve_local_media_path_for_delete($deleteMediaPath);
 		if ($target !== null) {
-			@unlink($target);
+			$mediaDirMtimeBeforeDelete = backup_media_dir_mtime();
+			$deleteMediaBytes = file_size_bytes($target);
+			if (@unlink($target) && $deleteMediaBytes > 0) {
+				adjust_backup_media_index_bytes(-$deleteMediaBytes, $mediaDirMtimeBeforeDelete);
+			}
 		}
 	}
 	set_flash_message('Post deleted.');
@@ -2255,7 +2369,7 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 	<meta name="description" content="<?= htmlspecialchars($sharePreviewDescription, ENT_QUOTES, 'UTF-8') ?>">
 	<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
 	<meta property="og:type" content="<?= htmlspecialchars($ogType, ENT_QUOTES, 'UTF-8') ?>">
-	<meta property="og:title" content="<?= htmlspecialchars($sharePreviewTitle, ENT_QUOTES, 'UTF-8') ?>">
+	<meta property="og:title" content="<?= htmlspecialchars($siteNameDisplay, ENT_QUOTES, 'UTF-8') ?>">
 	<meta property="og:description" content="<?= htmlspecialchars($sharePreviewDescription, ENT_QUOTES, 'UTF-8') ?>">
 	<meta property="og:url" content="<?= htmlspecialchars($shareUrl, ENT_QUOTES, 'UTF-8') ?>">
 	<meta property="og:image" content="<?= htmlspecialchars($sharePreviewImageUrl, ENT_QUOTES, 'UTF-8') ?>">
