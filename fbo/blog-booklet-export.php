@@ -134,7 +134,6 @@ function fbo_booklet_shuffleboard_posts(array $fallbackPosts, string $siteName):
 function fbo_booklet_snapshot_markup(array $posts, string $siteName): string
 {
 	$cards = fbo_booklet_shuffleboard_posts($posts, $siteName);
-	$accounts = array_values(array_unique(array_map(static fn(array $card): string => (string) $card['account'], $cards)));
 	$heartMask = [
 		'11111111111',
 		'11001110011',
@@ -147,7 +146,7 @@ function fbo_booklet_snapshot_markup(array $posts, string $siteName): string
 		'11111111111',
 	];
 	$maskImage = $cards[0]['image'] ?? '';
-	$markup = '<div class="shuffle-snapshot"><div class="snapshot-title">FBO SHUFFLEBOARD</div><div class="snapshot-blog">' . fbo_booklet_escape(implode(' / ', $accounts)) . '</div><div class="snapshot-grid">';
+	$markup = '<div class="shuffle-snapshot"><div class="snapshot-title"><span class="snapshot-fbo">FBO</span><span>Shuffleboard</span></div><div class="snapshot-grid">';
 	$cardIndex = 0;
 	$rows = count($heartMask);
 	$cols = strlen($heartMask[0]);
@@ -163,7 +162,7 @@ function fbo_booklet_snapshot_markup(array $posts, string $siteName): string
 			$markup .= '<div class="snapshot-cell">';
 			if (isset($cards[$cardIndex])) {
 				$card = $cards[$cardIndex++];
-				$markup .= '<img src="' . fbo_booklet_escape($card['image']) . '" alt=""><span>' . fbo_booklet_escape($card['account']) . '</span>';
+				$markup .= '<img src="' . fbo_booklet_escape($card['image']) . '" alt="">';
 			}
 			$markup .= '</div>';
 		}
@@ -238,12 +237,13 @@ function fbo_export_blog_booklet(array $posts, array $captions, string $siteName
 	$css = <<<'CSS'
 @page { size: A4 landscape; margin: 0; }
 @font-face { font-family: AmericanTypewriter; src: url('__FONT__') format('woff2'); font-weight: 700; }
-@font-face { font-family: Inter; src: local('Inter'); font-weight: 100 900; }
+@font-face { font-family: Inter; font-style: normal; font-weight: 100 900; font-display: swap; src: local('Inter'), url('/fbo/assets/fonts/InterVariable.woff2') format('woff2'); }
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: #777; color: #141414; font-family: AmericanTypewriter, Georgia, serif; }
+html, body { margin: 0; padding: 0; background: #777; color: #141414; font-family: Inter, Arial, sans-serif; }
 .print-side { width: 297mm; height: 210mm; display: flex; page-break-after: always; background: #fff; }
 .booklet-page { width: 148.5mm; height: 210mm; padding: 15mm; overflow: hidden; background: #fff; position: relative; }
 .cover, .back-cover { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: baseline; }
+.back-cover { font-family: Inter, sans-serif; }
 .cover-mark { display: flex; align-items: center; justify-content: center; height: 46mm; font-size: 42mm; line-height: 1; transform: translateY(-40px); }
 .cover-mark span { display: block; }
 .cover-mark svg { width: 31.5mm; height: 31.5mm; margin-left: 3mm; }
@@ -258,13 +258,12 @@ h1 { font-size: 25pt; margin: 8mm 0 0; text-transform: uppercase; }
 .media-placeholder small { font-family: Georgia, serif; font-size: 8pt; }
 .post-link { font-family: Inter, sans-serif; font-size: 7pt; line-height: 1.25; overflow-wrap: anywhere; margin: 12mm 0 8mm; }
 .shuffle-snapshot { width: 100%; }
-.snapshot-title { font-size: 16pt; }
-.snapshot-blog { font-size: 9pt; margin: 3mm 0 8mm; }
+.snapshot-title { display: flex; align-items: center; gap: 2mm; width: 100%; margin: 0 0 5mm; font-size: 16pt; font-weight: 700; line-height: 1; }
+.snapshot-fbo { display: inline-block; padding: 1mm 1.8mm 1.2mm; background: #101010; color: #f3f3f3; font-weight: 700; line-height: 1; }
 .snapshot-grid { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: .45mm; }
 .snapshot-cell { aspect-ratio: 3 / 4; border: .35mm solid #101010; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; position: relative; background: #eee; }
 .snapshot-mask { border-color: #fff; background-repeat: no-repeat; background-blend-mode: color, normal; filter: saturate(1.1) brightness(.9) contrast(1.1); }
 .snapshot-cell img { width: 100%; height: 100%; object-fit: cover; }
-.snapshot-cell span { position: absolute; left: 0; right: 0; bottom: 0; padding: 1.5mm; color: #fff; background: rgba(0, 0, 0, .7); font: 6pt Inter, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .blank-page { background: #fff; }
 @media screen { .print-side { margin: 10mm auto; box-shadow: 0 1mm 4mm #333; } }
 @media print { html, body { background: #fff; } }
