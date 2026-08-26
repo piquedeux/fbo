@@ -733,22 +733,36 @@
 
       const openCamera = async () => {
         const wantsAudio = mode === "video";
+        const videoConstraints =
+          mode === "video"
+            ? {
+                width: { ideal: 1280, max: 1280 },
+                height: { ideal: 720, max: 720 },
+                frameRate: { ideal: 30, max: 30 },
+              }
+            : { facingMode: { ideal: currentFacingMode } };
         const tryGetStream = async (includeAudio) => {
           const candidates = [];
 
           if (preferredDeviceId) {
             candidates.push({
-              video: { deviceId: { exact: preferredDeviceId } },
+              video: {
+                ...videoConstraints,
+                deviceId: { exact: preferredDeviceId },
+              },
               audio: includeAudio,
             });
           }
 
           candidates.push({
-            video: { facingMode: { ideal: currentFacingMode } },
+            video: { ...videoConstraints },
             audio: includeAudio,
           });
 
-          candidates.push({ video: true, audio: includeAudio });
+          candidates.push({
+            video: mode === "video" ? { ...videoConstraints } : true,
+            audio: includeAudio,
+          });
 
           for (const mediaConstraints of candidates) {
             try {
@@ -880,9 +894,12 @@
         }
 
         try {
-          recorder = mimeType
-            ? new MediaRecorder(camStream, { mimeType })
-            : new MediaRecorder(camStream);
+          const recorderOptions = mimeType ? { mimeType } : {};
+          if (mode === "video") {
+            recorderOptions.videoBitsPerSecond = 2_500_000;
+            recorderOptions.audioBitsPerSecond = 128_000;
+          }
+          recorder = new MediaRecorder(camStream, recorderOptions);
         } catch (e) {
           alert("Video recording is not supported in this browser.");
           return;
