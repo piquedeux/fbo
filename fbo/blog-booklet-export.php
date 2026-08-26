@@ -33,7 +33,10 @@ function fbo_booklet_media_uri(array $post): string
 function fbo_booklet_estimate_size_bytes(array $posts, array $captions = []): int
 {
 	$bytes = 180000;
-	foreach ([__DIR__ . '/assets/fonts/American-Typewriter-Bold.woff2', __DIR__ . '/assets/icon/logo.svg'] as $assetPath) {
+	foreach ([
+		__DIR__ . '/assets/fonts/American-Typewriter-Bold.woff2',
+		__DIR__ . '/assets/icon/logo.svg',
+	] as $assetPath) {
 		$size = @filesize($assetPath);
 		if (is_int($size) && $size > 0) {
 			$bytes += $size;
@@ -74,43 +77,96 @@ function fbo_booklet_post_url(array $post): string
 	return '';
 }
 
-function fbo_booklet_qr_markup(string $url): string
+function fbo_booklet_link_markup(string $url): string
 {
-	if ($url === '' || !function_exists('shell_exec')) {
-		return '<div class="qr-fallback">' . fbo_booklet_escape($url) . '</div>';
+	return '<div class="post-link">' . fbo_booklet_escape($url) . '</div>';
+}
+
+function fbo_booklet_shuffleboard_posts(array $fallbackPosts, string $siteName): array
+{
+	$cards = [];
+	$blogsDir = dirname(__DIR__) . '/multi-tenant/blogs';
+	$blogDirs = is_dir($blogsDir) ? (scandir($blogsDir) ?: []) : [];
+	foreach ($blogDirs as $blogWord) {
+		if ($blogWord === '.' || $blogWord === '..') {
+			continue;
+		}
+		$blogPath = $blogsDir . '/' . $blogWord;
+		if (!is_dir($blogPath)) {
+			continue;
+		}
+		$settingsPath = $blogPath . '/backend/settings.json';
+		$settings = is_file($settingsPath) ? json_decode((string) @file_get_contents($settingsPath), true) : [];
+		$accountName = trim((string) (($settings['site_name'] ?? '') ?: $blogWord));
+		$postsPath = $blogPath . '/backend/posts.json';
+		$blogPosts = is_file($postsPath) ? json_decode((string) @file_get_contents($postsPath), true) : [];
+		$blogPosts = is_array($blogPosts) ? $blogPosts : [];
+		foreach ($blogPosts as $post) {
+			if (!is_array($post) || empty($post['allow_shuffleboard']) || (string) ($post['type'] ?? '') !== 'image') {
+				continue;
+			}
+			$relativePath = ltrim(trim((string) ($post['path'] ?? '')), '/');
+			$filePath = realpath($blogPath . '/' . $relativePath);
+			if ($relativePath === '' || $filePath === false || !is_file($filePath)) {
+				continue;
+			}
+			$mime = function_exists('mime_content_type') ? (string) @mime_content_type($filePath) : 'image/jpeg';
+			$image = fbo_booklet_data_uri($filePath, str_starts_with($mime, 'image/') ? $mime : 'image/jpeg');
+			if ($image !== '') {
+				$cards[] = ['image' => $image, 'account' => $accountName];
+			}
+		}
 	}
-	$command = 'command -v qrencode >/dev/null 2>&1 && qrencode -t SVG -o - -- ' . escapeshellarg($url) . ' 2>/dev/null';
-	$svg = @shell_exec($command);
-	if (!is_string($svg) || strpos($svg, '<svg') === false) {
-		return '<div class="qr-fallback">' . fbo_booklet_escape($url) . '</div>';
+	if ($cards === []) {
+		foreach ($fallbackPosts as $post) {
+			if (!is_array($post) || empty($post['allow_shuffleboard'])) {
+				continue;
+			}
+			$image = fbo_booklet_media_uri($post);
+			if ($image !== '') {
+				$cards[] = ['image' => $image, 'account' => $siteName];
+			}
+		}
 	}
-	$svg = preg_replace('/<\?xml[^>]*\?>/i', '', $svg) ?? $svg;
-	$svg = preg_replace('/<!DOCTYPE[^>]*>/i', '', $svg) ?? $svg;
-	return '<div class="qr-code">' . $svg . '</div>';
+	return $cards;
 }
 
 function fbo_booklet_snapshot_markup(array $posts, string $siteName): string
 {
-	$cards = [];
-	foreach ($posts as $post) {
-		if (!is_array($post) || empty($post['allow_shuffleboard'])) {
-			continue;
+	$cards = fbo_booklet_shuffleboard_posts($posts, $siteName);
+	$accounts = array_values(array_unique(array_map(static fn(array $card): string => (string) $card['account'], $cards)));
+	$heartMask = [
+		'11111111111',
+		'11001110011',
+		'10000100001',
+		'10000000001',
+		'11000000011',
+		'11100000111',
+		'11110001111',
+		'11111011111',
+		'11111111111',
+	];
+	$maskImage = $cards[0]['image'] ?? '';
+	$markup = '<div class="shuffle-snapshot"><div class="snapshot-title">FBO SHUFFLEBOARD</div><div class="snapshot-blog">' . fbo_booklet_escape(implode(' / ', $accounts)) . '</div><div class="snapshot-grid">';
+	$cardIndex = 0;
+	$rows = count($heartMask);
+	$cols = strlen($heartMask[0]);
+	for ($rowIndex = 0; $rowIndex < $rows; $rowIndex++) {
+		for ($colIndex = 0; $colIndex < $cols; $colIndex++) {
+			if (($heartMask[$rowIndex][$colIndex] ?? '0') === '0' && $maskImage !== '') {
+				$x = $cols > 1 ? ($colIndex / ($cols - 1)) * 100 : 0;
+				$y = $rows > 1 ? ($rowIndex / ($rows - 1)) * 100 : 0;
+				$style = ' style="background-image: linear-gradient(0deg, #ff1a1a 0%, #ff1a1a 100%), url(' . fbo_booklet_escape($maskImage) . '); background-size: 1100% 900%; background-position: ' . number_format($x, 3, '.', '') . '% ' . number_format($y, 3, '.', '') . '%;"';
+				$markup .= '<div class="snapshot-cell snapshot-mask"' . $style . '></div>';
+				continue;
+			}
+			$markup .= '<div class="snapshot-cell">';
+			if (isset($cards[$cardIndex])) {
+				$card = $cards[$cardIndex++];
+				$markup .= '<img src="' . fbo_booklet_escape($card['image']) . '" alt=""><span>' . fbo_booklet_escape($card['account']) . '</span>';
+			}
+			$markup .= '</div>';
 		}
-		$image = fbo_booklet_media_uri($post);
-		if ($image !== '') {
-			$cards[] = $image;
-		}
-		if (count($cards) >= 12) {
-			break;
-		}
-	}
-	$markup = '<div class="shuffle-snapshot"><div class="snapshot-title">FBO SHUFFLEBOARD</div><div class="snapshot-blog">' . fbo_booklet_escape($siteName) . '</div><div class="snapshot-grid">';
-	for ($index = 0; $index < 12; $index++) {
-		$markup .= '<div class="snapshot-cell">';
-		if (isset($cards[$index])) {
-			$markup .= '<img src="' . fbo_booklet_escape($cards[$index]) . '" alt="">';
-		}
-		$markup .= '</div>';
 	}
 	return $markup . '</div></div>';
 }
@@ -134,7 +190,7 @@ function fbo_booklet_post_markup(array $post, array $captions): string
 		return $markup . '<div class="post-date">' . fbo_booklet_escape($date) . '</div></div>';
 	}
 	if ($type === 'audio' || $type === 'video') {
-		$markup .= '<div class="media-placeholder">' . fbo_booklet_escape(strtoupper($type)) . fbo_booklet_qr_markup(fbo_booklet_post_url($post)) . '<small>Scan to open this post online.</small></div>';
+		$markup .= '<div class="media-placeholder">' . fbo_booklet_escape(strtoupper($type)) . fbo_booklet_link_markup(fbo_booklet_post_url($post)) . '<small>Open this post online.</small></div>';
 	} else {
 		$markup .= '<div class="media-placeholder">' . fbo_booklet_escape($type) . '<br><small>This media format is not printable as a still image.</small></div>';
 	}
@@ -182,32 +238,33 @@ function fbo_export_blog_booklet(array $posts, array $captions, string $siteName
 	$css = <<<'CSS'
 @page { size: A4 landscape; margin: 0; }
 @font-face { font-family: AmericanTypewriter; src: url('__FONT__') format('woff2'); font-weight: 700; }
+@font-face { font-family: Inter; src: local('Inter'); font-weight: 100 900; }
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: #777; color: #141414; font-family: AmericanTypewriter, Georgia, serif; }
 .print-side { width: 297mm; height: 210mm; display: flex; page-break-after: always; background: #fff; }
 .booklet-page { width: 148.5mm; height: 210mm; padding: 15mm; overflow: hidden; background: #fff; position: relative; }
 .cover, .back-cover { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: baseline; }
-.cover-mark { display: flex; align-items: center; justify-content: center; height: 46mm; font-size: 42mm; line-height: 1; }
+.cover-mark { display: flex; align-items: center; justify-content: center; height: 46mm; font-size: 42mm; line-height: 1; transform: translateY(-40px); }
 .cover-mark span { display: block; }
 .cover-mark svg { width: 31.5mm; height: 31.5mm; margin-left: 3mm; }
 h1 { font-size: 25pt; margin: 8mm 0 0; text-transform: uppercase; }
 .post-frame { height: 178mm; border: .5mm solid #141414; padding: 8mm; display: flex; flex-direction: column; }
-.post-text { flex: 1; font-family: Inter, Arial, sans-serif; font-size: 17pt; line-height: 1.4; white-space: normal; }
+.post-text { flex: 1; font-family: Inter, sans-serif; font-size: 17pt; line-height: 1.4; white-space: normal; }
 .post-image { display: block; width: calc(100% + 16mm); height: 135mm; margin-left: -8mm; object-fit: contain; }
 .post-image-separator { border-top: .5mm solid #141414; width: calc(100% + 16mm); margin-left: -8mm; }
-.post-caption { font-family: Inter, Arial, sans-serif; font-size: 9pt; margin-top: 4mm; }
+.post-caption { font-family: Inter, sans-serif; font-size: 9pt; margin-top: 4mm; }
 .post-date { font-size: 8pt; margin-top: auto; padding-top: 4mm; }
 .media-placeholder { flex: 1; margin: 0; padding: 12mm; text-align: center; font-size: 16pt; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .media-placeholder small { font-family: Georgia, serif; font-size: 8pt; }
-.qr-code { width: 45mm; height: 45mm; margin: 12mm auto 8mm; }
-.qr-code svg { width: 100%; height: 100%; }
-.qr-fallback { font-family: Georgia, serif; font-size: 7pt; overflow-wrap: anywhere; margin: 8mm 0; }
+.post-link { font-family: Inter, sans-serif; font-size: 7pt; line-height: 1.25; overflow-wrap: anywhere; margin: 12mm 0 8mm; }
 .shuffle-snapshot { width: 100%; }
 .snapshot-title { font-size: 16pt; }
 .snapshot-blog { font-size: 9pt; margin: 3mm 0 8mm; }
-.snapshot-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; }
-.snapshot-cell { aspect-ratio: 1.4; border: .5mm solid #f00; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.snapshot-grid { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: .45mm; }
+.snapshot-cell { aspect-ratio: 3 / 4; border: .35mm solid #101010; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; position: relative; background: #eee; }
+.snapshot-mask { border-color: #fff; background-repeat: no-repeat; background-blend-mode: color, normal; filter: saturate(1.1) brightness(.9) contrast(1.1); }
 .snapshot-cell img { width: 100%; height: 100%; object-fit: cover; }
+.snapshot-cell span { position: absolute; left: 0; right: 0; bottom: 0; padding: 1.5mm; color: #fff; background: rgba(0, 0, 0, .7); font: 6pt Inter, sans-serif; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .blank-page { background: #fff; }
 @media screen { .print-side { margin: 10mm auto; box-shadow: 0 1mm 4mm #333; } }
 @media print { html, body { background: #fff; } }
