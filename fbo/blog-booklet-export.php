@@ -250,10 +250,10 @@ html, body { margin: 0; padding: 0; background: #777; color: #141414; font-famil
 .print-side { width: 297mm; height: 210mm; display: flex; page-break-after: always; background: #fff; }
 .booklet-page { width: 148.5mm; height: 210mm; padding: 15mm; overflow: hidden; background: #fff; position: relative; }
 .cover, .back-cover { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: baseline; }
-.back-cover { font-family: Inter, Arial, sans-serif; }
+.back-cover { font-family: Inter, Arial, sans-serif; font-weight: 600;}
 .cover-mark { display: flex; align-items: center; justify-content: center; height: 46mm; font-size: 42mm; line-height: 1; }
 .cover-mark span { display: block; }
-.cover-mark svg { width: 31.5mm; height: 31.5mm; margin-left: 3mm; transform: translateY(-40px); }
+.cover-mark svg { width: 31.5mm; height: 31.5mm; margin-left: 3mm; transform: translateY(-10px); }
 h1 { font-size: 25pt; margin: 8mm 0 0; text-transform: uppercase; }
 .post-frame { height: 178mm; border: .5mm solid #141414; padding: 8mm; display: flex; flex-direction: column; }
 .post-text { flex: 1; font-family: Inter, Arial, sans-serif; font-size: 17pt; line-height: 1.4; white-space: normal; }
