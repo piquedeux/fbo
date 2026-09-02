@@ -237,6 +237,7 @@ $maskImageCss = $initialMaskCard !== null
 $gridCards = $cards;
 $gridCardCount = count($gridCards);
 $blogCount = count($blogs);
+$blogCountLabel = $blogCount === 1 ? '1 blog' : $blogCount . ' blogs';
 ?>
 
 <!--
@@ -350,9 +351,9 @@ moritzgauss.com | @piquedeux | github.com/piquedeux
 			?>
 		</div>
 
-		<section class="shuffle-search-block" aria-labelledby="shuffleSearchLabel">
+	<section class="shuffle-search-block" aria-labelledby="shuffleSearchLabel">
 <label class="shuffle-search-label" id="shuffleSearchLabel" for="shuffleBlogSearch">
-    Search blogs <span class="meta"><?= $allBlogsFinal ?></span> 
+    Search blogs <span class="meta"><?= htmlspecialchars($blogCountLabel, ENT_QUOTES, 'UTF-8') ?></span> 
 </label>
 			<input
 				type="search"

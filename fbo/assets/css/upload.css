@@ -329,6 +329,84 @@
     color: #C91E1E;
 }
 
+.compose-post-progress {
+    --compose-post-loader-red: #ff0900;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 34px;
+    min-width: 36px;
+    border: 2px solid var(--line);
+    background: var(--bg);
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.compose-post-progress[hidden] {
+    display: none !important;
+}
+
+.compose-post-progress-mark {
+    position: relative;
+    display: block;
+    width: 24px;
+    height: 25px;
+    background: color-mix(in srgb, var(--compose-post-loader-red) 18%, transparent);
+    -webkit-mask: url("../material/loader.svg") center / contain no-repeat;
+    mask: url("../material/loader.svg") center / contain no-repeat;
+    image-rendering: pixelated;
+}
+
+.compose-post-progress-mark::before,
+.compose-post-progress-mark::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+}
+
+.compose-post-progress-mark::before {
+    height: 0;
+    background: var(--compose-post-loader-red);
+    animation: compose-post-progress-fill 1.15s steps(10, end) infinite;
+}
+
+.compose-post-progress-mark::after {
+    inset: 0;
+    background-image:
+        linear-gradient(to right, rgba(255, 255, 255, 0.32) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.32) 1px, transparent 1px);
+    background-size: 4px 4px;
+    opacity: 0.34;
+    mix-blend-mode: screen;
+}
+
+.upload-panel.is-posting button[type='submit'] {
+    background: var(--fg);
+    color: var(--bg);
+    cursor: wait;
+    pointer-events: none;
+}
+
+@keyframes compose-post-progress-fill {
+    0% {
+        height: 0;
+    }
+
+    82%,
+    100% {
+        height: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .compose-post-progress-mark::before {
+        height: 100%;
+        animation: none;
+    }
+}
+
 .blog-modal-overlay {
     position: fixed;
     inset: 0;
