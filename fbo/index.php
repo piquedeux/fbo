@@ -37,6 +37,8 @@ if (!function_exists('array_is_list')) {
 
 session_start();
 
+require_once __DIR__ . '/blog-booklet-export.php';
+
 const MAX_TEXT_POST_LENGTH = 280;
 const MAX_IMAGE_UPLOAD_FILE_SIZE_BYTES = 10485760;
 const MAX_IMAGE_UPLOAD_FILES_PER_REQUEST = 10;
@@ -2247,8 +2249,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && isset($_GET['download_bac
 	exit;
 }
 
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && isset($_GET['export_booklet']) && $adminAuthed) {
+	fbo_export_blog_booklet(load_posts(), load_captions(), $siteName);
+}
+
 $posts = load_posts();
 $captions = load_captions();
+$bookletEstimateBytes = fbo_booklet_estimate_size_bytes($posts, $captions);
 $allPostsCount = count($posts);
 $singlePostMode = false;
 if ($requestedPostId !== '' && !$composeMode) {
