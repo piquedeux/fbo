@@ -15,6 +15,70 @@ function fbo_booklet_data_uri(string $path, string $mime): string
 	return is_string($data) ? 'data:' . $mime . ';base64,' . base64_encode($data) : '';
 }
 
+function fbo_booklet_image_data_uri(string $path): string
+{
+	static $cache = [];
+	$cacheKey = $path . '|' . (string) @filemtime($path);
+	if (array_key_exists($cacheKey, $cache)) {
+		return $cache[$cacheKey];
+	}
+
+	$empty = static function () use (&$cache, $cacheKey): string {
+		$cache[$cacheKey] = '';
+		return '';
+	};
+	if (!is_file($path) || !is_readable($path)) {
+		return $empty();
+	}
+
+	// Do not load files that could exhaust the request memory limit.
+	$sourceBytes = @filesize($path);
+	if (!is_int($sourceBytes) || $sourceBytes <= 0 || $sourceBytes > 16 * 1024 * 1024) {
+		return $empty();
+	}
+	$dimensions = @getimagesize($path);
+	if (!is_array($dimensions) || (int) ($dimensions[0] ?? 0) < 1 || (int) ($dimensions[1] ?? 0) < 1) {
+		return $empty();
+	}
+	$sourceWidth = (int) $dimensions[0];
+	$sourceHeight = (int) $dimensions[1];
+	if ($sourceWidth * $sourceHeight > 40_000_000 || !function_exists('imagecreatefromstring') || !function_exists('imagejpeg')) {
+		return $empty();
+	}
+
+	$data = @file_get_contents($path);
+	$image = is_string($data) ? @imagecreatefromstring($data) : false;
+	unset($data);
+	if ($image === false) {
+		return $empty();
+	}
+
+	$maxDimension = 1800;
+	$scale = min(1.0, $maxDimension / max($sourceWidth, $sourceHeight));
+	$width = max(1, (int) round($sourceWidth * $scale));
+	$height = max(1, (int) round($sourceHeight * $scale));
+	$resized = imagecreatetruecolor($width, $height);
+	$white = imagecolorallocate($resized, 255, 255, 255);
+	imagefill($resized, 0, 0, $white);
+	imagecopyresampled($resized, $image, 0, 0, 0, 0, $width, $height, $sourceWidth, $sourceHeight);
+	imagedestroy($image);
+
+	ob_start();
+	$encoded = imagejpeg($resized, null, 82);
+	$output = $encoded ? (string) ob_get_clean() : '';
+	if (!$encoded) {
+		ob_end_clean();
+	}
+	imagedestroy($resized);
+	if ($output === '') {
+		return $empty();
+	}
+
+	$uri = 'data:image/jpeg;base64,' . base64_encode($output);
+	$cache[$cacheKey] = $uri;
+	return $uri;
+}
+
 function fbo_booklet_media_uri(array $post): string
 {
 	if ((string) ($post['type'] ?? '') !== 'image' || !function_exists('media_dir_path')) {
@@ -26,8 +90,7 @@ function fbo_booklet_media_uri(array $post): string
 	if ($mediaRoot === false || $filePath === false || !is_file($filePath) || !str_starts_with($filePath, $mediaRoot . DIRECTORY_SEPARATOR)) {
 		return '';
 	}
-	$mime = function_exists('mime_content_type') ? (string) @mime_content_type($filePath) : 'image/jpeg';
-	return fbo_booklet_data_uri($filePath, str_starts_with($mime, 'image/') ? $mime : 'image/jpeg');
+	return fbo_booklet_image_data_uri($filePath);
 }
 
 function fbo_booklet_estimate_size_bytes(array $posts, array $captions = []): int

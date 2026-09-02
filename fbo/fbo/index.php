@@ -10,7 +10,7 @@ function local_asset_url(string $relativePath): string
 	$cleanPath = ltrim($relativePath, '/');
 	$fullPath = dirname(__DIR__) . '/' . $cleanPath;
 	$version = is_file($fullPath) ? (string) filemtime($fullPath) : '1';
-	return htmlspecialchars('../' . $cleanPath . '?v=' . rawurlencode($version), ENT_QUOTES, 'UTF-8');
+	return htmlspecialchars('/fbo/' . $cleanPath . '?v=' . rawurlencode($version), ENT_QUOTES, 'UTF-8');
 }
 
 $blogs = [];

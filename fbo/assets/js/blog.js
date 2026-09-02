@@ -497,6 +497,64 @@
   }
 })();
 
+(() => {
+  const buildPostingProgress = () => {
+    const progress = document.createElement("div");
+    progress.className = "compose-post-progress";
+    progress.setAttribute("role", "progressbar");
+    progress.setAttribute("aria-label", "Posting");
+    progress.setAttribute("aria-busy", "true");
+
+    const mark = document.createElement("span");
+    mark.className = "compose-post-progress-mark";
+    mark.setAttribute("aria-hidden", "true");
+
+    const label = document.createElement("span");
+    label.className = "sr-only";
+    label.textContent = "Posting";
+
+    progress.appendChild(mark);
+    progress.appendChild(label);
+    return progress;
+  };
+
+  const showPostingProgress = (form, submitter) => {
+    if (!(form instanceof HTMLFormElement)) return;
+
+    let progress = form.querySelector(".compose-post-progress");
+    if (!progress) {
+      progress = buildPostingProgress();
+      const trigger =
+        submitter instanceof Element
+          ? submitter
+          : form.querySelector('button[type="submit"]');
+      const actions = trigger?.closest(".hero-actions");
+      if (actions) {
+        actions.appendChild(progress);
+      } else {
+        form.appendChild(progress);
+      }
+    }
+
+    form.classList.add("is-posting");
+    form.setAttribute("aria-busy", "true");
+    progress.removeAttribute("hidden");
+  };
+
+  const installPostingProgress = (formId) => {
+    const form = document.getElementById(formId);
+    if (!(form instanceof HTMLFormElement)) return;
+
+    form.addEventListener("submit", (event) => {
+      if (event.defaultPrevented) return;
+      showPostingProgress(form, event.submitter);
+    });
+  };
+
+  installPostingProgress("inlineUploadForm");
+  installPostingProgress("textPostForm");
+})();
+
 // Upload media toggle removed: inline upload form always visible now.
 
 (() => {
