@@ -250,16 +250,17 @@ html, body { margin: 0; padding: 0; background: #777; color: #141414; font-famil
 .print-side { width: 297mm; height: 210mm; display: flex; page-break-after: always; background: #fff; }
 .booklet-page { width: 148.5mm; height: 210mm; padding: 15mm; overflow: hidden; background: #fff; position: relative; }
 .cover, .back-cover { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: baseline; }
+.back-cover { font-family: Inter, Arial, sans-serif; }
 .cover-mark { display: flex; align-items: center; justify-content: center; height: 46mm; font-size: 42mm; line-height: 1; }
 .cover-mark span { display: block; }
-.cover-mark svg { width: 31.5mm; height: 31.5mm; margin-left: 3mm; }
+.cover-mark svg { width: 31.5mm; height: 31.5mm; margin-left: 3mm; transform: translateY(-40px); }
 h1 { font-size: 25pt; margin: 8mm 0 0; text-transform: uppercase; }
 .post-frame { height: 178mm; border: .5mm solid #141414; padding: 8mm; display: flex; flex-direction: column; }
 .post-text { flex: 1; font-family: Inter, Arial, sans-serif; font-size: 17pt; line-height: 1.4; white-space: normal; }
 .post-image { display: block; width: calc(100% + 16mm); height: 135mm; margin-left: -8mm; object-fit: contain; }
 .post-image-separator { border-top: .5mm solid #141414; width: calc(100% + 16mm); margin-left: -8mm; }
 .post-caption { font-family: Inter, Arial, sans-serif; font-size: 9pt; margin-top: 4mm; }
-.post-date { font-size: 8pt; margin-top: auto; padding-top: 4mm; }
+.post-date { font-family: Inter, Arial, sans-serif; font-size: 8pt; margin-top: auto; padding-top: 4mm; }
 .media-placeholder { flex: 1; margin: 0; padding: 12mm; text-align: center; font-size: 16pt; display: flex; flex-direction: column; align-items: center; justify-content: center; }
 .media-placeholder small { font-family: Georgia, serif; font-size: 8pt; }
 .qr-code { width: 45mm; height: 45mm; margin: 12mm auto 8mm; }
