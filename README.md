@@ -60,16 +60,25 @@ This keeps the platform easy to run while still isolating each blog's data.
 
 ## Visitor contributions
 
-Visitors leave exactly three distinct symbols from a set of 24 before entering a
+Visitors leave exactly three symbols from a set of 24 before entering a
 blog. None are preselected: visitors must choose their three symbols. Entry lasts for the
 browser session, separately for each blog; owners bypass the entry screen.
 Each blog starts with three persistent random symbols. Each contribution replaces
-all three header symbols. The owner's compose/edit dashboard shows the last ten
+all three header symbols. The owner's footprints tab shows the last ten
 changes, newest first, with timestamps and the contributor's blog name when logged
 in. Anonymous changes show only their timestamp. Hover animates header symbols;
 click shows a small, absolutely positioned preview at the top center for 3 seconds.
-Symbols are flat black SVGs without depth or shadow. CSS perspective places their
-Z-axis rotation in 3D space; the horse gallops instead.
+Symbols are smooth SVG silhouettes. The entry selection fills them with images
+from the current blog (black fallback when it has no images); the header uses
+black silhouettes. Motif animations play on selection, hover and the tap preview.
+The footprints tab contains private notes and silhouette changes, separate from compose and edit.
+Note login links use the remembered blog cookie or session when available.
+Otherwise they lead to the root page. Entry selection allows exactly three symbols,
+including repeats. Tap a symbol again to increase its count; when all three slots
+are filled, tap a selected symbol to clear its count and choose again.
+Shuffleboard displays all 24 silhouettes beside FBO; tapping them identifies the
+FBO obolus. The booklet back page uses three silhouettes filled with randomly
+chosen image posts (repeated when fewer than three images are available).
 
 Visitors logged in to an existing FBO blog can send private notes on individual
 posts after entering. The receiving owner reads them with a link to the post in

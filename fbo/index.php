@@ -1552,6 +1552,8 @@ $view = isset($_GET['view']) && in_array($_GET['view'], ['grid', 'single'], true
 	: 'grid';
 $editMode = isset($_GET['edit']) && $_GET['edit'] === '1';
 $composeMode = isset($_GET['compose']) && $_GET['compose'] === '1';
+$footprintsMode = isset($_GET['footprints']) && $_GET['footprints'] === '1';
+if ($footprintsMode) { $composeMode = false; $editMode = false; }
 $shuffleRequested = isset($_GET['shuffle']) && (string) $_GET['shuffle'] === '1';
 $shuffleSeedParam = (int) ($_GET['shuffle_seed'] ?? 0);
 if ($composeMode) {
@@ -2268,7 +2270,7 @@ if ($visitorGate) {
 session_write_close();
 $posts = load_posts();
 $captions = load_captions();
-$bookletEstimateBytes = ($adminAuthed && $editMode) ? fbo_booklet_estimate_size_bytes($posts, $captions) : 0;
+$bookletEstimateBytes = $adminAuthed ? fbo_booklet_estimate_size_bytes($posts, $captions) : 0;
 $allPostsCount = count($posts);
 $singlePostMode = false;
 if ($requestedPostId !== '' && !$composeMode) {
@@ -2347,6 +2349,7 @@ if ($shuffleActive) {
 }
 
 $stateQuery = '';
+if ($footprintsMode) $stateQuery .= '&footprints=1';
 if ($editMode) {
 	$stateQuery .= '&edit=1';
 }
@@ -2405,7 +2408,7 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 	<link rel="stylesheet" href="<?= local_asset_url('assets/css/upload.css') ?>">
 	<link rel="stylesheet" href="<?= local_asset_url('assets/css/audio-player.css') ?>">
 	<link rel="stylesheet" href="<?= local_asset_url('assets/css/visitor-interactions.css') ?>">
-	<?php if ($editMode || $composeMode): ?>
+	<?php if ($adminAuthed || $editMode || $composeMode): ?>
 		<link rel="stylesheet" href="<?= local_asset_url('assets/css/admin.css') ?>">
 	<?php endif; ?>
 </head>
@@ -2417,6 +2420,7 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 		<div class="intro-fbo" id="introFboText">F</div>
 	</div>
 	<?php include __DIR__ . '/snippets/header.php'; ?>
+	<?php include __DIR__ . '/snippets/visitor-dashboard.php'; ?>
 
 	<nav class="topbar<?= $composeMode ? ' topbar-compose' : '' ?>">
 		<div class="topbar-left">
@@ -2575,7 +2579,7 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 					</form>
 					<?php elseif ($visitorIdentity !== ''): ?>
 					<a class="ui-btn" href="<?= htmlspecialchars(blog_share_url((string) $post['id']), ENT_QUOTES, 'UTF-8') ?>#note-form">leave a note</a>
-					<?php else: ?><a class="ui-btn" href="/create">log in to leave a note</a><?php endif; ?>
+					<?php else: ?><a class="ui-btn" href="<?= htmlspecialchars($visitorLoginUrl, ENT_QUOTES, 'UTF-8') ?>">log in to leave a note</a><?php endif; ?>
 					</div>
 					<?php endif; ?>
 				</article>

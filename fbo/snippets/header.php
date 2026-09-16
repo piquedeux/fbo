@@ -17,6 +17,8 @@
 				<?php if ($adminAuthed): ?>
 					<a href="?<?= $blogQ ?>compose=1&view=<?= $view ?>&page=<?= $page ?>" class="ui-btn <?= $composeMode ? 'active' : '' ?>">compose</a>
 					<a href="?<?= $blogQ ?>edit=1&view=<?= $view ?>&page=<?= $page ?>" class="ui-btn <?= $editMode ? 'active' : '' ?>">edit</a>
+					<a href="?<?= $blogQ ?>footprints=1" class="ui-btn <?= $footprintsMode ? 'active' : '' ?>">footprints</a>
+					<button type="button" class="ui-btn" id="exportBookletBtn">booklet</button>
 					<form method="post" class="inline-form">
 						<button type="submit" name="admin_logout" value="1" class="ui-btn">logout</button>
 					</form>
@@ -36,6 +38,9 @@
 
 	<?php if ($composeMode): ?>
 		<?php include __DIR__ . '/header-compose.php'; ?>
+	<?php endif; ?>
+	<?php if ($adminAuthed): ?>
+		<?php include __DIR__ . '/booklet-export.php'; ?>
 	<?php endif; ?>
 	<?php include __DIR__ . '/visitor-header.php'; ?>
 </header>

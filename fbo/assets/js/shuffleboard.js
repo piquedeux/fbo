@@ -313,6 +313,7 @@
           '">' +
           '<span class="shuffle-search-hit-word">' +
           blog.word +
+          (blog.symbols_html || '') +
           "</span>" +
           (blog.is_own ? '<small class="shuffle-blog-card-meta">your blog</small>' : "") +
           '<span class="shuffle-search-hit-url">' +

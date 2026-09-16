@@ -226,26 +226,23 @@ function fbo_booklet_qr_markup(string $url): string
 
 function fbo_booklet_snapshot_markup(array $posts, string $siteName): string
 {
+	require_once __DIR__ . '/visitor-symbols.php';
+	$images = array_values(array_filter($posts, static fn($post) => is_array($post) && ($post['type'] ?? '') === 'image'));
+	shuffle($images);
 	$cards = [];
-	foreach ($posts as $post) {
-		if (!is_array($post) || empty($post['allow_shuffleboard'])) {
-			continue;
-		}
+	foreach ($images as $post) {
 		$image = fbo_booklet_media_uri($post);
 		if ($image !== '') {
 			$cards[] = $image;
 		}
-		if (count($cards) >= 12) {
+		if (count($cards) >= 3) {
 			break;
 		}
 	}
-	$markup = '<div class="shuffle-snapshot"><div class="snapshot-title">FBO SHUFFLEBOARD</div><div class="snapshot-blog">' . fbo_booklet_escape($siteName) . '</div><div class="snapshot-grid">';
-	for ($index = 0; $index < 12; $index++) {
-		$markup .= '<div class="snapshot-cell">';
-		if (isset($cards[$index])) {
-			$markup .= '<img src="' . fbo_booklet_escape($cards[$index]) . '" alt="">';
-		}
-		$markup .= '</div>';
+	$symbols = array_rand(FBO_SYMBOLS, 3);
+	$markup = '<div class="obolus-back"><div class="snapshot-title">FBO OBOLUS</div><div class="snapshot-blog">' . fbo_booklet_escape($siteName) . '</div><div class="obolus-masks">';
+	foreach ($symbols as $index => $symbol) {
+		$markup .= fbo_symbol_svg($symbol, $cards ? $cards[$index % count($cards)] : '');
 	}
 	return $markup . '</div></div>';
 }
@@ -344,6 +341,10 @@ h1 { font-size: 25pt; margin: 8mm 0 0; text-transform: uppercase; }
 .snapshot-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; }
 .snapshot-cell { aspect-ratio: 1.4; border: .5mm solid #f00; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .snapshot-cell img { width: 100%; height: 100%; object-fit: cover; }
+.obolus-back { width: 100%; text-align: center; }
+.obolus-masks { display: flex; align-items: center; justify-content: center; gap: 4mm; }
+.obolus-masks svg { width: 35mm; height: 35mm; flex: 0 0 35mm; }
+.obolus-masks .visitor-horse-legs-b { display: none; }
 .blank-page { background: #fff; }
 @media screen { .print-side { margin: 10mm auto; box-shadow: 0 1mm 4mm #333; } }
 @media print { html, body { background: #fff; } }

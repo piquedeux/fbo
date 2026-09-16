@@ -21,6 +21,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 require_once dirname(__DIR__) . '/multi-tenant/core/db.php';
 require_once dirname(__DIR__) . '/multi-tenant/core/remembered-blog.php';
+require_once __DIR__ . '/visitor-symbols.php';
 
 function local_asset_url(string $relativePath): string
 {
@@ -148,6 +149,7 @@ Foreach ($dirs as $word) {
 			'url' => $blogUrl,
 			'fullUrl' => $fullUrl,
 			'name' => $siteName,
+			'symbols_html' => fbo_blog_list_symbols($blogPath),
 			'post_count' => $postCount,
 			'media_types' => $mediaTypesList,
 			'media_types_display' => $mediaTypesDisplay,
@@ -270,12 +272,22 @@ moritzgauss.com | @piquedeux | github.com/piquedeux
 	<title>FBO Shuffleboard</title>
 	<link rel="stylesheet" href="<?= local_asset_url('assets/css/styles.css') ?>">
 	<link rel="stylesheet" href="<?= local_asset_url('assets/css/shuffleboard.css') ?>">
+	<link rel="stylesheet" href="<?= local_asset_url('assets/css/visitor-interactions.css') ?>">
 </head>
 
 <body class="shuffleboard-page">
 	<header class="hero">
 		<div class="hero-head">
-			<a href="/" class="logo logo-link"><span class="fbo-title-mark-black">FBO</span>Shuffleboard</a>
+			<div class="shuffle-obolus-heading"><a href="/" class="logo logo-link"><span class="fbo-title-mark-black">FBO</span></a>
+			<?php require_once __DIR__ . '/visitor-symbols.php'; ?>
+			<div class="shuffle-obolus-window" aria-label="FBO obolus">
+			<div class="shuffle-obolus-track">
+			<?php for ($copy = 0; $copy < 2; $copy++): ?>
+			<div class="visitor-symbols shuffle-obolus-symbols<?= $copy ? ' shuffle-obolus-copy' : '' ?>" <?= $copy ? 'aria-hidden="true"' : '' ?>>
+			<?php foreach (FBO_SYMBOLS as $index => $symbol): ?><button type="button" class="visitor-symbol-button" data-visitor-symbol="<?= $index ?>" data-obolus <?= $copy ? 'tabindex="-1"' : '' ?> aria-label="FBO obolus: <?= htmlspecialchars($symbol, ENT_QUOTES, 'UTF-8') ?>"><?= fbo_symbol_svg($index) ?></button><?php endforeach; ?>
+			</div>
+			<?php endfor; ?>
+			</div></div></div>
 			<div class="hero-right">
 				<div class="hero-actions">
 					<?php if ($ownBlogWord !== ''): ?>
@@ -286,7 +298,7 @@ moritzgauss.com | @piquedeux | github.com/piquedeux
 					<a href="/fbo/fbo" class="ui-btn shuffle-info-btn" aria-label="About FBO" title="FBO info">i</a>
 				</div>
 				<?php if ($ownBlogWord !== ''): ?>
-					<a href="/create" class="ui-btn shuffle-create-another">create another blog</a>
+					<a href="/create" class="ui-btn shuffle-create-another">create</a>
 				<?php endif; ?>
 			</div>
 		</div>
@@ -391,13 +403,13 @@ moritzgauss.com | @piquedeux | github.com/piquedeux
 				<?php foreach ($blogs as $blog): ?>
 					<div class="shuffle-blog-card" data-own-blog="<?= !empty($blog['is_own']) ? '1' : '0' ?>" data-blog-word="<?= htmlspecialchars((string) ($blog['word'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
 						<a class="shuffle-blog-card-link" href="<?= htmlspecialchars((string) $blog['url'], ENT_QUOTES, 'UTF-8') ?>">
-							<div class="shuffle-blog-card-name"><?= htmlspecialchars((string) $blog['name'], ENT_QUOTES, 'UTF-8') ?></div>
+							<div class="shuffle-blog-card-name"><?= htmlspecialchars((string) $blog['name'], ENT_QUOTES, 'UTF-8') ?><?= $blog['symbols_html'] ?></div>
 							<?php if (!empty($blog['is_own'])): ?><small class="shuffle-blog-card-meta">your blog</small><?php endif; ?>
 							<div class="shuffle-blog-card-meta"><?= htmlspecialchars((string) ($blog['media_types_display'] ?? 'mixed'), ENT_QUOTES, 'UTF-8') ?> • <?= htmlspecialchars((string) ($blog['post_count_display'] ?? ((string) ((int) ($blog['post_count'] ?? 0)) . ' posts')), ENT_QUOTES, 'UTF-8') ?></div>
 							<div class="shuffle-blog-card-meta">created <?= htmlspecialchars((string) ($blog['created_at_display'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
 						</a>
 						<div class="shuffle-blog-card-actions">
-							<button type="button" class="shuffle-blog-favorite-btn ui-btn" data-blog-word="<?= htmlspecialchars((string) ($blog['word'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" aria-pressed="false">favorite</button>
+							<?php if (empty($blog['is_own'])): ?><button type="button" class="shuffle-blog-favorite-btn ui-btn" data-blog-word="<?= htmlspecialchars((string) ($blog['word'] ?? ''), ENT_QUOTES, 'UTF-8') ?>" aria-pressed="false">favorite</button><?php endif; ?>
 							<button type="button" class="shuffle-blog-preview-btn ui-btn" data-fullurl="<?= htmlspecialchars((string) ($blog['fullUrl'] ?? $blog['url']), ENT_QUOTES, 'UTF-8') ?>" aria-label="Quick view <?= htmlspecialchars((string) $blog['name'], ENT_QUOTES, 'UTF-8') ?>">quickview</button>
 						</div>
 					</div>
@@ -407,10 +419,11 @@ moritzgauss.com | @piquedeux | github.com/piquedeux
 	</main>
 
 	<script id="shuffleMaskCardsData" type="application/json"><?= htmlspecialchars(json_encode($cards, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_NOQUOTES, 'UTF-8') ?></script>
-	<script id="shuffleBlogsData" type="application/json"><?= htmlspecialchars(json_encode($blogs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_NOQUOTES, 'UTF-8') ?></script>
+	<script id="shuffleBlogsData" type="application/json"><?= json_encode($blogs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
 	<?php include __DIR__ . '/snippets/cookie-banner.php'; ?>
 	<script src="<?= local_asset_url('assets/js/script.js') ?>" defer></script>
 	<script src="<?= local_asset_url('assets/js/shuffleboard.js') ?>" defer></script>
+	<script src="<?= local_asset_url('assets/js/visitor-symbols.js') ?>&amp;release=mobile-motion-2" defer></script>
 </body>
 
 </html>

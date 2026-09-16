@@ -3,41 +3,6 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/visitor-symbols.php';
 
-// PHP protection also prevents direct downloads on servers without rewrite rules.
-function fbo_interactions_read(string $path): array
-{
-    if (!is_file($path)) return [];
-    $file = fopen($path, 'rb');
-    if (!$file) throw new RuntimeException('Could not read visitor data.');
-    try {
-        if (!flock($file, LOCK_SH)) throw new RuntimeException('Could not lock visitor data.');
-        fgets($file);
-        $rows = [];
-        while (($line = fgets($file)) !== false) {
-            $row = json_decode($line, true);
-            if (is_array($row)) $rows[] = $row;
-        }
-        return $rows;
-    } finally { fclose($file); }
-}
-
-function fbo_interactions_append(string $path, array $row): void
-{
-    $file = fopen($path, 'c+b');
-    if (!$file) throw new RuntimeException('Could not save. Please try again.');
-    try {
-        if (!flock($file, LOCK_EX)) throw new RuntimeException('Could not lock visitor data.');
-        fseek($file, 0, SEEK_END);
-        $start = ftell($file);
-        if (($row['type'] ?? '') === 'initial_symbols' && $start > 0) return;
-        $line = ($start === 0 ? "<?php http_response_code(404); exit; ?>\n" : '')
-            . json_encode($row, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE) . "\n";
-        if (fwrite($file, $line) !== strlen($line) || !fflush($file)) {
-            ftruncate($file, $start);
-            throw new RuntimeException('Could not save. Please try again.');
-        }
-    } finally { fclose($file); }
-}
 
 function fbo_visitor_identity(): string
 {
@@ -54,6 +19,14 @@ function fbo_visitor_identity(): string
 }
 
 $visitorIdentity = fbo_visitor_identity();
+$visitorLoginUrl = '/';
+foreach ([$_COOKIE[MT_REMEMBERED_BLOG_COOKIE] ?? '', $_SESSION['fbo_last_blog_word'] ?? ''] as $rememberedWord) {
+    if (is_string($rememberedWord) && preg_match('/\A[a-z0-9_-]{1,24}\z/', $rememberedWord)
+        && is_file(dirname(__DIR__) . '/multi-tenant/blogs/' . $rememberedWord . '/backend/.auth.json')) {
+        $visitorLoginUrl = '/blog/' . rawurlencode($rememberedWord) . '?compose=1';
+        break;
+    }
+}
 $interactionKey = hash('sha256', blog_root());
 $_SESSION['fbo_interaction_csrf'] ??= bin2hex(random_bytes(32));
 $interactionToken = $_SESSION['fbo_interaction_csrf'];
@@ -74,7 +47,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['visitor_ac
                 if (!is_string($choice) || !ctype_digit($choice) || !array_key_exists((int) $choice, FBO_SYMBOLS)) throw new RuntimeException('Choose three symbols from the selection.');
             }
             $choices = array_map('intval', $choices);
-            if (count(array_unique($choices)) !== 3) throw new RuntimeException('Choose three different symbols.');
             fbo_interactions_append($interactionPath, ['type' => 'symbols', 'symbols' => $choices, 'author' => $visitorIdentity, 'time' => time()]);
             $_SESSION['fbo_entered'][$interactionKey] = true;
         } elseif ($action === 'note' || $action === 'comment') {
