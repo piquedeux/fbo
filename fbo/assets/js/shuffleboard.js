@@ -85,11 +85,6 @@
 
   const hasMaskCells = maskLinks.length > 0;
 
-  cards.forEach((card) => {
-    const img = new Image();
-    img.src = card.media_url;
-  });
-
   let index = Math.floor(Math.random() * cards.length);
   let displayedCard = cards[0];
   let switchApplyTimer = null;
@@ -160,10 +155,40 @@
     return nextIndex;
   };
 
+  let gridVisible = true;
+  let pendingImage = null;
+  let pendingTimeout = null;
+  const cancelPendingImage = () => {
+    if (pendingTimeout !== null) window.clearTimeout(pendingTimeout);
+    pendingTimeout = null;
+    if (pendingImage) {
+      pendingImage.onload = null;
+      pendingImage.onerror = null;
+      pendingImage.src = "";
+      pendingImage = null;
+    }
+  };
+
   const nextCard = (animate = true, immediate = false) => {
-    if (!hasMaskCells) return;
+    if (!hasMaskCells || pendingImage || document.hidden || !gridVisible) return;
     const nextIndex = randomNextIndex();
-    switchToIndex(nextIndex, animate, immediate);
+    if (nextIndex === index) return;
+    // Load only the next featured image, leaving bandwidth for visible posts.
+    // Keep the current image in place if the next one is slow or unavailable.
+    const image = new Image();
+    pendingImage = image;
+    image.decoding = "async";
+    image.fetchPriority = "low";
+    image.onload = () => {
+      window.clearTimeout(pendingTimeout);
+      pendingTimeout = null;
+      pendingImage = null;
+      image.onload = image.onerror = null;
+      if (!document.hidden && gridVisible) switchToIndex(nextIndex, animate, immediate);
+    };
+    image.onerror = cancelPendingImage;
+    pendingTimeout = window.setTimeout(cancelPendingImage, 8000);
+    image.src = cards[nextIndex].media_url;
   };
 
   let intervalId = null;
@@ -171,10 +196,30 @@
     if (intervalId !== null) {
       window.clearInterval(intervalId);
     }
+    intervalId = null;
+    if (document.hidden || !gridVisible || !hasMaskCells) return;
     intervalId = window.setInterval(() => {
       nextCard(true);
     }, ROTATE_INTERVAL_MS);
   };
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) cancelPendingImage();
+    restartInterval();
+  });
+  window.addEventListener("pagehide", () => {
+    cancelPendingImage();
+    window.clearInterval(intervalId);
+  });
+  window.addEventListener("pageshow", restartInterval);
+  if ("IntersectionObserver" in window) {
+    const observer = new IntersectionObserver(([entry]) => {
+      gridVisible = entry.isIntersecting;
+      if (!gridVisible) cancelPendingImage();
+      restartInterval();
+    });
+    observer.observe(grid);
+  }
 
   if (shuffleBtn) {
     shuffleBtn.addEventListener("click", () => {
@@ -269,6 +314,7 @@
           '<span class="shuffle-search-hit-word">' +
           blog.word +
           "</span>" +
+          (blog.is_own ? '<small class="shuffle-blog-card-meta">your blog</small>' : "") +
           '<span class="shuffle-search-hit-url">' +
           blog.fullUrl +
           "</span>" +
@@ -362,6 +408,9 @@
     const cards = Array.from(container.querySelectorAll(".shuffle-blog-card"));
 
     cards.sort((left, right) => {
+      const leftOwn = left.dataset.ownBlog === "1";
+      const rightOwn = right.dataset.ownBlog === "1";
+      if (leftOwn !== rightOwn) return leftOwn ? -1 : 1;
       const leftWord = String(left.getAttribute("data-blog-word") || "").trim();
       const rightWord = String(
         right.getAttribute("data-blog-word") || "",

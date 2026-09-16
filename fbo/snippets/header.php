@@ -1,7 +1,10 @@
 <header class="hero">
 	<?php $shareLabel = (!empty($singlePostMode) && !empty($requestedPostId)) ? 'share post' : 'share'; ?>
 	<div class="hero-head">
+		<div class="blog-heading">
 		<a href="<?= htmlspecialchars(blog_self_url(), ENT_QUOTES, 'UTF-8') ?>" class="logo logo-link" id="siteTitleDisplay"><?= htmlspecialchars($siteNameDisplay, ENT_QUOTES, 'UTF-8') ?></a>
+		<?php include __DIR__ . '/visitor-symbols.php'; ?>
+		</div>
 		<div class="hero-right">
 			<div class="fbo"><a href="/shuffleboard" class="fbo-link" title="FBO Project stands for Fuck Being Online"><span class="fbo-title-mark-black">FBO</span></a></div>
 		</div>
@@ -34,4 +37,5 @@
 	<?php if ($composeMode): ?>
 		<?php include __DIR__ . '/header-compose.php'; ?>
 	<?php endif; ?>
+	<?php include __DIR__ . '/visitor-header.php'; ?>
 </header>

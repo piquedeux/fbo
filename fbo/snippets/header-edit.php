@@ -1,6 +1,9 @@
 <?php if ($adminAuthed): ?>
 
     <div class="subtitle-line">Edit subtitle and manage your blog</div>
+	<div class="hero-actions">
+		<a href="/create" class="ui-btn">create another blog</a>
+	</div>
 
 	<form method="post" class="subtitle-form">
 		<input type="text" class="upload-auth-input" name="hero_subtitle" maxlength="180"
@@ -37,7 +40,7 @@
 					<li>Enable <strong>two-sided / duplex</strong> printing and choose <strong>flip on short edge</strong>. This keeps the A5 pages correctly oriented for folding.</li>
 					<li>For a PDF first choose <strong>Save as PDF</strong>. For the physical copy choose the duplex printer, then fold each A4 sheet in the centre and stack the sheets.</li>
 				</ol>
-				<p class="upload-note">The size is an estimate and can vary with browser serialization. Browser PDF printing does not guarantee CMYK; use a print-prepress workflow for CMYK production.</p>
+				<p class="upload-note">The size is a rough estimate based on source files. Resizing and browser serialization can change the download size. Browser PDF printing does not guarantee CMYK; use a print-prepress workflow for CMYK production.</p>
 			</div>
 			<div class="blog-modal-actions">
 				<a href="?<?= $blogQ ?>export_booklet=1" class="ui-btn ui-btn-strong" id="confirmBookletExport">Download HTML</a>

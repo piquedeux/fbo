@@ -227,7 +227,7 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 	</style>
 </head>
 
-<body class="intro-loading">
+<body data-intro-requested="1">
 	<div class="intro-overlay" id="introOverlay" aria-hidden="true">
 		<div class="intro-fbo" id="introFboText">F</div>
 	</div>
@@ -274,7 +274,7 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 
 				<article class="item" id="legal">
 					<div class="text-post-body fbo-legal">
-						<details class="fbo-legal-item">
+						<details class="fbo-legal-item" id="cookies">
 							<summary>Annoying stuff</summary>
 							<div class="fbo-legal-copy">
 
@@ -283,7 +283,7 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 								<p><strong>1. Hosting and server logs</strong><br>When you access this website, technically required data (for example IP address, date/time, requested page, browser details) may be processed in server log files to ensure secure operation (Art. 6(1)(f) GDPR).</p>
 								<p><strong>2. Contact</strong><br>If you contact us, your transmitted data is processed to handle your request (Art. 6(1)(b) or (f) GDPR).</p>
 								<p><strong>3. Your rights</strong><br>You have rights of access, rectification, deletion, restriction, data portability, and objection where applicable.</p>
-								<p><strong>4. Cookies</strong><br>No tracking cookies are active right now, so no cookie banner is currently displayed.</p>
+								<p><strong>4. Cookies and browser storage</strong><br>FBO uses a session cookie for login, a cookie to remember your last created or managed blog, and a cookie for Shuffleboard favorites. The remembered blog and favorites cookies last up to one year. Clicking “Got it” on the cookie notice saves your dismissal for one year. Your light or dark theme preference is saved in local browser storage. FBO does not use tracking or advertising cookies. You can remove these cookies and preferences in your browser settings; this also clears your login session and remembered preferences.</p>
 							</div>
 						</details>
 					</div>
@@ -303,6 +303,7 @@ if ($lastBlogWord !== '' && preg_match('/^[a-z0-9_-]{1,24}$/', $lastBlogWord) ==
 
 	</div>
 
+	<?php include dirname(__DIR__) . '/snippets/cookie-banner.php'; ?>
 	<script src="<?= local_asset_url('assets/js/script.js') ?>" defer></script>
 </body>
 

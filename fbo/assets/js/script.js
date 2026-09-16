@@ -42,9 +42,16 @@
   }
 
   // Play big intro on page load
-  if (body.classList.contains("intro-loading")) {
+  if (body.dataset.introRequested === "1") {
     playBig();
   }
+
+  // A page restored from the back/forward cache must not retain its exit overlay.
+  window.addEventListener("pageshow", (event) => {
+    if (!event.persisted) return;
+    body.classList.remove("intro-loading");
+    document.getElementById("introOverlay")?.classList.remove("done");
+  });
 
   // Title/logo click → big animation then navigate
   const logoLink = document.getElementById("siteTitleDisplay");
@@ -673,28 +680,17 @@
         const sliceH = Math.floor(outH / 3);
         for (let index = 0; index < sampleTimes.length; index += 1) {
           const time = Math.min(safeEnd, sampleTimes[index]);
-          await new Promise((resolve, reject) => {
-            const cleanup = () => {
-              probe.removeEventListener("seeked", onSeeked);
-              probe.removeEventListener("error", onError);
-            };
-            const onSeeked = () => {
-              cleanup();
-              resolve();
-            };
-            const onError = () => {
-              cleanup();
-              reject(new Error("seek error"));
-            };
-            probe.addEventListener("seeked", onSeeked, { once: true });
-            probe.addEventListener("error", onError, { once: true });
+          if (Math.abs(probe.currentTime - time) > 0.01) {
+            const seeked = waitForEvent(probe, "seeked", 4000);
             try {
               probe.currentTime = time;
-            } catch (error) {
-              cleanup();
-              reject(error);
+            } catch {
+              probe.dispatchEvent(new Event("error"));
             }
-          });
+            await seeked;
+          } else if (probe.readyState < 2) {
+            await waitForEvent(probe, "loadeddata", 4000);
+          }
 
           drawCoverFrame(
             ctx,
@@ -711,6 +707,9 @@
       } catch {
         // Leave the video element as-is if poster generation fails.
       } finally {
+        probe.pause();
+        probe.removeAttribute("src");
+        probe.load();
         probe.remove();
       }
     };

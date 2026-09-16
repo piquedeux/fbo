@@ -635,7 +635,7 @@ body.header-peek .hero-actions {
 
 .fbo-title-mark-black {
 	display: inline-block;
-	background: #101010;
+	background: #ff0000;
 	color: #f3f3f3;
 	font-weight: 700;
 	line-height: 1;
@@ -643,7 +643,7 @@ body.header-peek .hero-actions {
 }
 
 body .fbo-title-mark-black {
-	background: #101010;
+	background: #ff0000;
 	color: #f3f3f3;
 }
 
@@ -654,7 +654,7 @@ body.dark .fbo-title-mark-black {
 
 .fbo-highlighted {
 	color: #f3f3f3;
-	background: #101010;
+	background: #FF0000;
 	padding: 6px 10px;
 	text-decoration: none;
 	display: inline-grid;
@@ -663,7 +663,7 @@ body.dark .fbo-title-mark-black {
 }
 
 body.dark .fbo-highlighted {
-	background: #ffffff;
+	background: #FF0000;
 	color: #101010;
 }
 

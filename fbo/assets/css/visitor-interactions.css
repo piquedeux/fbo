@@ -1,0 +1,72 @@
+.blog-heading { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; container-type: inline-size; }
+.blog-heading .logo { white-space: nowrap; font-size: clamp(10px, 3.6cqi, 18px); flex-shrink: 0; }
+.blog-heading .visitor-symbols { gap: clamp(1px, .6cqi, 8px); }
+.blog-heading .visitor-symbol-button { width: clamp(18px, 4.5cqi, 40px); height: clamp(24px, 4.5cqi, 40px); padding: clamp(2px, .5cqi, 6px); }
+.blog-heading .visitor-pixel-symbol { width: clamp(14px, 3.5cqi, 28px); height: clamp(14px, 3.5cqi, 28px); }
+.visitor-symbols { display: flex; align-items: center; flex-shrink: 0; gap: 8px; margin-top: 0; overflow: visible; }
+@media (max-width: 600px) { .blog-heading { gap: 5px; } .hero:has(.blog-heading) .hero-head { gap: 8px; } }
+.visitor-symbols span { white-space: nowrap; }
+.visitor-panel { margin-top: 12px; }
+.visitor-panel summary { cursor: pointer; }
+.visitor-panel textarea { display: block; width: 100%; max-width: 480px; min-height: 80px; margin: 8px 0; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); }
+.visitor-comment { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.visitor-comment p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.visitor-entry { max-width: 440px; margin: 32px auto; padding: 16px; }
+.visitor-selection { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; border: 0; padding: 12px 0; }
+.visitor-selection label { position: relative; display: flex; align-items: center; justify-content: center; min-height: 48px; cursor: pointer; border: 0; background: none; }
+.visitor-selection input { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.visitor-selection label .visitor-pixel-symbol { opacity: .28; transition: opacity 150ms ease; }
+.visitor-selection input:checked + .visitor-pixel-symbol { opacity: 1; }
+.visitor-selection input:focus-visible + .visitor-pixel-symbol { outline: 2px dotted var(--fg); outline-offset: 5px; }
+.visitor-pixel-symbol { display: block; width: 28px; height: 28px; flex-shrink: 0; color: #000; fill: #000; }
+.visitor-contribution { display: inline-flex; align-items: center; gap: 4px; }
+.visitor-symbols .visitor-symbol-button { appearance: none; display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: #000; cursor: pointer; border-radius: 0; perspective: 300px; }
+.visitor-symbol-button:focus-visible { outline: 2px solid var(--fg); outline-offset: 1px; }
+.visitor-symbols .visitor-symbol-button:hover { background: transparent; }
+.visitor-horse-legs-b { visibility: hidden; }
+.visitor-symbol-overlay { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); z-index: 10000; display: grid; place-items: center; width: 144px; height: 144px; pointer-events: none; perspective: 600px; }
+.visitor-symbol-overlay[hidden] { display: none; }
+.visitor-symbol-stage { transform: rotateX(18deg) rotateY(-16deg); transform-style: preserve-3d; }
+.visitor-symbol-large { width: 112px; height: 112px; transform-style: preserve-3d; }
+.visitor-symbol-large .visitor-pixel-symbol { width: 100%; height: 100%; }
+.visitor-pixel-symbol { transform-origin: center; --symbol-motion: visitor-header-turn; --symbol-speed: 1.5s; }
+.visitor-pixel-symbol[data-motion="gallop"] { --symbol-motion: visitor-header-gallop; --symbol-speed: 360ms; }
+.visitor-pixel-symbol[data-motion="music"] { --symbol-motion: visitor-music; --symbol-speed: 600ms; }
+.visitor-pixel-symbol[data-motion="twinkle"] { --symbol-motion: visitor-twinkle; --symbol-speed: 900ms; }
+.visitor-pixel-symbol[data-motion="flash"] { --symbol-motion: visitor-flash; --symbol-speed: 700ms; }
+.visitor-pixel-symbol[data-motion="sway"] { --symbol-motion: visitor-sway; --symbol-speed: 1.2s; }
+.visitor-pixel-symbol[data-motion="shake"] { --symbol-motion: visitor-shake; --symbol-speed: 450ms; }
+.visitor-pixel-symbol[data-motion="float"] { --symbol-motion: visitor-float; --symbol-speed: 1.4s; }
+.visitor-pixel-symbol[data-motion="nod"] { --symbol-motion: visitor-nod; --symbol-speed: 850ms; }
+.visitor-pixel-symbol[data-motion="beat"] { --symbol-motion: visitor-beat; --symbol-speed: 900ms; }
+.visitor-pixel-symbol[data-motion="flutter"] { --symbol-motion: visitor-flutter; --symbol-speed: 380ms; }
+.visitor-pixel-symbol[data-motion="launch"] { --symbol-motion: visitor-launch; --symbol-speed: 1.2s; }
+.visitor-pixel-symbol[data-motion="burn"] { --symbol-motion: visitor-burn; --symbol-speed: 450ms; transform-origin: 50% 90%; }
+.visitor-pixel-symbol[data-motion="grow"] { --symbol-motion: visitor-grow; --symbol-speed: 1.2s; transform-origin: bottom; }
+:is(.visitor-symbol-button:hover, .visitor-symbol-button:focus-visible, .visitor-selection label:hover, .visitor-selection label:has(input:focus-visible), .visitor-selection label:has(input:checked), .visitor-symbol-large) .visitor-pixel-symbol { animation: var(--symbol-motion) var(--symbol-speed) ease-in-out infinite; }
+:is(.visitor-symbol-button:hover, .visitor-symbol-button:focus-visible, .visitor-selection label:hover, .visitor-selection label:has(input:focus-visible), .visitor-selection label:has(input:checked), .visitor-symbol-large) .visitor-horse-legs-a { animation: visitor-horse-frame-a 360ms steps(1, end) infinite; }
+:is(.visitor-symbol-button:hover, .visitor-symbol-button:focus-visible, .visitor-selection label:hover, .visitor-selection label:has(input:focus-visible), .visitor-selection label:has(input:checked), .visitor-symbol-large) .visitor-horse-legs-b { animation: visitor-horse-frame-b 360ms steps(1, end) infinite; }
+@keyframes visitor-music { 0%, 100% { transform: translateY(0) rotate(-8deg); } 50% { transform: translateY(-12%) rotate(8deg); } }
+@keyframes visitor-twinkle { 0%, 100% { transform: scale(.8); } 50% { transform: scale(1.12) rotate(15deg); } }
+@keyframes visitor-flash { 0%, 45%, 60%, 100% { transform: translateX(0); } 48%, 56% { transform: translateX(8%) skewX(-12deg); } 52% { transform: translateX(-8%); } }
+@keyframes visitor-sway { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } }
+@keyframes visitor-shake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-8deg); } 75% { transform: rotate(8deg); } }
+@keyframes visitor-float { 0%, 100% { transform: translateY(4%); } 50% { transform: translateY(-14%); } }
+@keyframes visitor-nod { 0%, 100% { transform: rotate(-5deg); } 50% { transform: translateY(6%) rotate(5deg); } }
+@keyframes visitor-beat { 0%, 40%, 100% { transform: scale(1); } 15% { transform: scale(1.18); } 28% { transform: scale(1.08); } }
+@keyframes visitor-flutter { 0%, 100% { transform: scaleX(1) translateY(0); } 50% { transform: scaleX(.35) translateY(-8%); } }
+@keyframes visitor-launch { 0%, 100% { transform: translateY(8%); } 50% { transform: translateY(-22%) rotate(4deg); } }
+@keyframes visitor-burn { 0%, 100% { transform: scale(1, 1) skewX(-3deg); } 25% { transform: scale(.88, 1.14) skewX(4deg); } 50% { transform: scale(1.08, .92) skewX(-5deg); } 75% { transform: scale(.94, 1.08) skewX(2deg); } }
+@keyframes visitor-grow { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12, 1.2); } }
+.visitor-history-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 6px 0; }
+@keyframes visitor-header-turn { from { transform: rotateX(18deg) rotateY(-16deg) rotateZ(0deg); } to { transform: rotateX(18deg) rotateY(-16deg) rotateZ(360deg); } }
+@keyframes visitor-header-gallop { 0%, 100% { transform: translateY(0) rotateZ(-3deg); } 50% { transform: translateY(-3px) rotateZ(3deg); } }
+@keyframes visitor-symbol-turn { from { transform: rotateZ(0deg); } to { transform: rotateZ(360deg); } }
+@keyframes visitor-horse-gallop { 0%, 100% { transform: translate3d(-8px, 0, 0) rotateZ(-3deg); } 50% { transform: translate3d(8px, -16px, 0) rotateZ(3deg); } }
+@keyframes visitor-horse-frame-a { 0%, 100% { visibility: visible; } 50% { visibility: hidden; } }
+@keyframes visitor-horse-frame-b { 0%, 100% { visibility: hidden; } 50% { visibility: visible; } }
+@media (prefers-reduced-motion: reduce) {
+  .visitor-pixel-symbol, .visitor-pixel-symbol g { animation: none !important; }
+  .visitor-symbol-large, .visitor-symbol-horse .visitor-horse-legs-a, .visitor-symbol-horse .visitor-horse-legs-b { animation: none; }
+  .visitor-symbol-button:is(:hover, :focus-visible) .visitor-pixel-symbol, .visitor-symbol-button:is(:hover, :focus-visible) g { animation: none !important; }
+}

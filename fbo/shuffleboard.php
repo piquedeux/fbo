@@ -20,6 +20,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 require_once dirname(__DIR__) . '/multi-tenant/core/db.php';
+require_once dirname(__DIR__) . '/multi-tenant/core/remembered-blog.php';
 
 function local_asset_url(string $relativePath): string
 {
@@ -77,6 +78,8 @@ $scheme = request_scheme();
 $host = (string) ($_SERVER['HTTP_HOST'] ?? 'example.com');
 
 $blogRows = function_exists('mt_list_blogs') ? mt_list_blogs() : [];
+$ownBlogWord = mt_remembered_blog($blogRows);
+session_write_close();
 $blogMetaByWord = [];
 foreach ($blogRows as $row) {
 	if (!is_array($row)) {
@@ -119,7 +122,7 @@ Foreach ($dirs as $word) {
 		}
 			$postCount = is_array($posts) ? count($posts) : 0;
 
-			if ($postCount <= 0) {
+			if ($postCount <= 0 && $wordKey !== $ownBlogWord) {
 				continue;
 			}
 
@@ -140,6 +143,7 @@ Foreach ($dirs as $word) {
 		$fullUrl = $scheme . '://' . $host . $blogUrl;
 
 		$blogs[] = [
+			'is_own' => $wordKey === $ownBlogWord,
 			'word' => $wordKey,
 			'url' => $blogUrl,
 			'fullUrl' => $fullUrl,
@@ -192,6 +196,10 @@ $blogs[] = [
 ];
 
 usort($blogs, static function (array $left, array $right): int {
+	$ownOrder = (int) !empty($right['is_own']) <=> (int) !empty($left['is_own']);
+	if ($ownOrder !== 0) {
+		return $ownOrder;
+	}
 	$leftSort = (int) ($left['sort_created_at'] ?? 0);
 	$rightSort = (int) ($right['sort_created_at'] ?? 0);
 	if ($leftSort !== $rightSort) {
@@ -270,9 +278,16 @@ moritzgauss.com | @piquedeux | github.com/piquedeux
 			<a href="/" class="logo logo-link"><span class="fbo-title-mark-black">FBO</span>Shuffleboard</a>
 			<div class="hero-right">
 				<div class="hero-actions">
-					<a href="/create" class="ui-btn">create blog</a>
+					<?php if ($ownBlogWord !== ''): ?>
+						<a href="/blog/<?= htmlspecialchars(rawurlencode($ownBlogWord), ENT_QUOTES, 'UTF-8') ?>?compose=1" class="ui-btn">login</a>
+					<?php else: ?>
+						<a href="/create" class="ui-btn">create blog</a>
+					<?php endif; ?>
 					<a href="/fbo/fbo" class="ui-btn shuffle-info-btn" aria-label="About FBO" title="FBO info">i</a>
 				</div>
+				<?php if ($ownBlogWord !== ''): ?>
+					<a href="/create" class="ui-btn shuffle-create-another">create another blog</a>
+				<?php endif; ?>
 			</div>
 		</div>
 		<div class="subtitle-line">Fuck Being Online.</div>
@@ -315,7 +330,7 @@ moritzgauss.com | @piquedeux | github.com/piquedeux
 								<a class="shuffle-post-link" href="<?= htmlspecialchars($card['post_url'], ENT_QUOTES, 'UTF-8') ?>">
 									<div class="shuffle-card-body">
 										<div class="media-wrap">
-											<img src="<?= htmlspecialchars($card['media_url'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($card['blog_name'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
+											<img src="<?= htmlspecialchars($card['media_url'], ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($card['blog_name'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy" decoding="async">
 										</div>
 									</div>
 								</a>
@@ -374,9 +389,10 @@ moritzgauss.com | @piquedeux | github.com/piquedeux
 			</div>
 			<div class="shuffle-blog-directory-grid">
 				<?php foreach ($blogs as $blog): ?>
-					<div class="shuffle-blog-card" data-blog-word="<?= htmlspecialchars((string) ($blog['word'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+					<div class="shuffle-blog-card" data-own-blog="<?= !empty($blog['is_own']) ? '1' : '0' ?>" data-blog-word="<?= htmlspecialchars((string) ($blog['word'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
 						<a class="shuffle-blog-card-link" href="<?= htmlspecialchars((string) $blog['url'], ENT_QUOTES, 'UTF-8') ?>">
 							<div class="shuffle-blog-card-name"><?= htmlspecialchars((string) $blog['name'], ENT_QUOTES, 'UTF-8') ?></div>
+							<?php if (!empty($blog['is_own'])): ?><small class="shuffle-blog-card-meta">your blog</small><?php endif; ?>
 							<div class="shuffle-blog-card-meta"><?= htmlspecialchars((string) ($blog['media_types_display'] ?? 'mixed'), ENT_QUOTES, 'UTF-8') ?> • <?= htmlspecialchars((string) ($blog['post_count_display'] ?? ((string) ((int) ($blog['post_count'] ?? 0)) . ' posts')), ENT_QUOTES, 'UTF-8') ?></div>
 							<div class="shuffle-blog-card-meta">created <?= htmlspecialchars((string) ($blog['created_at_display'] ?? ''), ENT_QUOTES, 'UTF-8') ?></div>
 						</a>
@@ -392,6 +408,7 @@ moritzgauss.com | @piquedeux | github.com/piquedeux
 
 	<script id="shuffleMaskCardsData" type="application/json"><?= htmlspecialchars(json_encode($cards, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_NOQUOTES, 'UTF-8') ?></script>
 	<script id="shuffleBlogsData" type="application/json"><?= htmlspecialchars(json_encode($blogs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), ENT_NOQUOTES, 'UTF-8') ?></script>
+	<?php include __DIR__ . '/snippets/cookie-banner.php'; ?>
 	<script src="<?= local_asset_url('assets/js/script.js') ?>" defer></script>
 	<script src="<?= local_asset_url('assets/js/shuffleboard.js') ?>" defer></script>
 </body>

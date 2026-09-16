@@ -57,3 +57,29 @@ This keeps the platform easy to run while still isolating each blog's data.
 - Clear separation: shared code vs. per-blog data.
 - Practical isolation: each blog can be managed independently.
 - Straightforward operations: simple files for content, predictable paths for media.
+
+## Visitor contributions
+
+Visitors leave exactly three distinct symbols from a set of 24 before entering a
+blog. None are preselected: visitors must choose their three symbols. Entry lasts for the
+browser session, separately for each blog; owners bypass the entry screen.
+Each blog starts with three persistent random symbols. Each contribution replaces
+all three header symbols. The owner's compose/edit dashboard shows the last ten
+changes, newest first, with timestamps and the contributor's blog name when logged
+in. Anonymous changes show only their timestamp. Hover animates header symbols;
+click shows a small, absolutely positioned preview at the top center for 3 seconds.
+Symbols are flat black SVGs without depth or shadow. CSS perspective places their
+Z-axis rotation in 3D space; the horse gallops instead.
+
+Visitors logged in to an existing FBO blog can send private notes on individual
+posts after entering. The receiving owner reads them with a link to the post in
+the private notes panel. Notes and contributor identities are never rendered for other visitors.
+The session's most recently managed, still-authenticated blog supplies identity.
+
+Data is stored separately in each blog's `backend/visitor-interactions.php`, with
+locked writes and a PHP guard against direct HTTP reads, and included in owner
+ZIP backups. Forms validate session CSRF tokens. Notes are limited to 2,000
+characters and one submission per 30 seconds per session per blog.
+
+The entry screen gates blog pages; existing direct media URLs and Shuffleboard
+publication remain available as before.

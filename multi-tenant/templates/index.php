@@ -3,6 +3,11 @@ declare(strict_types=1);
 
 require_once dirname(__DIR__) . '/core/tenant.php';
 require_once dirname(__DIR__) . '/core/db.php';
+require_once dirname(__DIR__) . '/core/remembered-blog.php';
+
+if (session_status() === PHP_SESSION_NONE) {
+	session_start();
+}
 
 $error = '';
 $blogInput = '';
@@ -24,6 +29,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['create_blo
 		if (empty($result['ok'])) {
 			$error = (string) ($result['message'] ?? 'Provisioning failed.');
 		} else {
+			mt_remember_blog((string) ($result['blog'] ?? mt_normalize_blog_word($blogInput)));
 			$targetUrl = mt_blog_url((string) ($result['blog'] ?? $blogInput));
 			header('Location: ' . $targetUrl);
 			exit;
@@ -32,6 +38,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['create_blo
 }
 
 $blogs = mt_list_blogs();
+$ownBlogWord = mt_remembered_blog($blogs);
+if ($ownBlogWord !== '') {
+	$ownBlogs = array_filter($blogs, static function (array $blog) use ($ownBlogWord): bool {
+		return ($blog['blog_word'] ?? '') === $ownBlogWord;
+	});
+	$otherBlogs = array_filter($blogs, static function (array $blog) use ($ownBlogWord): bool {
+		return ($blog['blog_word'] ?? '') !== $ownBlogWord;
+	});
+	$blogs = array_merge($ownBlogs, $otherBlogs);
+}
 
 function mt_asset_url(string $path): string
 {
@@ -85,15 +101,15 @@ $previewUrl = $scheme . '://' . $host . '/blog/' . rawurlencode($previewWord);
 					<div class="logo" id="onboardingTitlePreview">
 						<?= htmlspecialchars(strtoupper($previewWord), ENT_QUOTES, 'UTF-8') ?>
 					</div>
-					<a href="/fbo/fbo" class="fbo fbo-link"><span class="fbo-title-mark-black">FBO</span></a>
+					<a href="/" class="fbo fbo-link"><span class="fbo-title-mark-black">FBO</span></a>
 				</div>
 			</div>
 			
-			<h2 class="onboarding-header">Welcome to the <a class="fbo-highlighted" href="/fbo/fbo"><span class="fbo-highlighted-ghost" aria-hidden="true">FBO</span><span class="fbo-highlighted-text" aria-hidden="true"><span>F</span><span>B</span><span>O</span></span><span class="sr-only">FBO</span></a> Project.</h2>
-			<h4 class="onboarding-subtitle">A blogging tool for people tired of platforms. Open source. No ads. No app. No ai.</h4>
+			<h2 class="onboarding-header">Welcome to the <a class="fbo-highlighted" href="/info"><span class="fbo-highlighted-ghost" aria-hidden="true">FBO</span><span class="fbo-highlighted-text" aria-hidden="true"><span>F</span><span>B</span><span>O</span></span><span class="sr-only">FBO</span></a> Project.</h2>
+			<h4 class="onboarding-subtitle">A blogging tool for people tired of performance platforms. Open source. No ads. No app. No ai.</h4>
 
-			<p class="subtitle-line onboarding-lead">Create your private blog on the <a href="/fbo/fbo/#server">FBO Project Server</a>. Pick a BLOGNAME. You don't need to register an email now, but for resetting your password, you could later.</p>
-			<p class="subtitle-line">1–24 characters. Letters, numbers _ and - only.</p>
+			<p class="subtitle-line onboarding-lead">Create your private blog on the <a href="/info#server">FBO Project Server</a>. Pick a BLOGNAME. You don't need to register an email now, but for resetting your password, you could later.</p>
+			<p class="subtitle-line">1–24 characters. Letters and numbers only. No spaces. Use underscores _ or hyphens - instead.</p>
 			<p class="subtitle-line">Your address: <span class="onboarding-url-preview"
 					id="onboardingUrlPreview"><?= htmlspecialchars($previewUrl, ENT_QUOTES, 'UTF-8') ?></span></p>
 
@@ -135,6 +151,7 @@ $previewUrl = $scheme . '://' . $host . '/blog/' . rawurlencode($previewWord);
 						<div class="subtitle-line ob-blog-item" data-word="<?= $safeWord ?>" data-url="<?= $safeUrl ?>"
 							data-fullurl="<?= $safeFullUrl ?>">
 							<a href="<?= $safeUrl ?>" class="text-link">/blog/<?= $safeWord ?></a>
+							<?php if ($word === $ownBlogWord): ?><small class="upload-note">your blog</small><?php endif; ?>
 							<span class="upload-note">&mdash; <?= $safeDate ?></span>
 						</div>
 					<?php endforeach; ?>
@@ -156,6 +173,7 @@ $previewUrl = $scheme . '://' . $host . '/blog/' . rawurlencode($previewWord);
 		</section>
 	</main>
 
+	<?php include dirname(__DIR__, 2) . '/fbo/snippets/cookie-banner.php'; ?>
 	<script src="<?= mt_asset_url('assets/js/onboarding.js') ?>" defer></script>
 </body>
 

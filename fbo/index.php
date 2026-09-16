@@ -38,6 +38,7 @@ if (!function_exists('array_is_list')) {
 session_start();
 
 require_once __DIR__ . '/blog-booklet-export.php';
+require_once dirname(__DIR__) . '/multi-tenant/core/remembered-blog.php';
 
 const MAX_TEXT_POST_LENGTH = 280;
 const MAX_IMAGE_UPLOAD_FILE_SIZE_BYTES = 10485760;
@@ -1524,7 +1525,7 @@ if (onboarding_required()) {
 			unset($_SESSION[OTP_RESET_SESSION_KEY]);
 			$_SESSION[ADMIN_SESSION_KEY] = true;
 			if ($_blogSafe !== '') {
-				$_SESSION[LAST_BLOG_SESSION_KEY] = $_blogSafe;
+				mt_remember_blog($_blogSafe);
 			}
 			set_flash_message('Password updated.');
 			header('Location: ?' . $blogQ . 'edit=1');
@@ -1564,7 +1565,7 @@ $adminAuthed = !empty($_SESSION[ADMIN_SESSION_KEY]);
 $authError = '';
 
 if ($adminAuthed && $_blogSafe !== '') {
-	$_SESSION[LAST_BLOG_SESSION_KEY] = $_blogSafe;
+	mt_remember_blog($_blogSafe);
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['admin_logout'])) {
@@ -1580,7 +1581,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['admin_logi
 	if ($passwordHash !== '' && password_verify($inputPassword, $passwordHash)) {
 		$_SESSION[ADMIN_SESSION_KEY] = true;
 		if ($_blogSafe !== '') {
-			$_SESSION[LAST_BLOG_SESSION_KEY] = $_blogSafe;
+			mt_remember_blog($_blogSafe);
 		}
 		header('Location: ' . $redirectAfterLogin);
 		exit;
@@ -1619,6 +1620,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['delete_blo
 		exit;
 	}
 
+	mt_forget_blog($blogWord);
 	unset($_SESSION[FLASH_MESSAGE_SESSION_KEY]);
 	unset($_SESSION[ADMIN_SESSION_KEY]);
 	unset($_SESSION[OTP_RESET_SESSION_KEY]);
@@ -2205,6 +2207,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && isset($_GET['download_bac
 	foreach ([
 		'posts.json' => $_backupDir . '/posts.json',
 		'captions.json' => $_backupDir . '/captions.json',
+		'visitor-interactions.php' => $_backupDir . '/visitor-interactions.php',
 		'settings.json' => $_backupDir . '/settings.json',
 		'.auth.json' => $_backupDir . '/.auth.json',
 	] as $_zipName => $_filePath) {
@@ -2250,12 +2253,22 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && isset($_GET['download_bac
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && isset($_GET['export_booklet']) && $adminAuthed) {
+	session_write_close();
 	fbo_export_blog_booklet(load_posts(), load_captions(), $siteName);
 }
 
+require __DIR__ . '/visitor-interactions.php';
+header('Cache-Control: private, no-store');
+if ($visitorGate) {
+	include __DIR__ . '/snippets/visitor-entry.php';
+	exit;
+}
+
+// Release the session lock before rendering so other tabs are not blocked.
+session_write_close();
 $posts = load_posts();
 $captions = load_captions();
-$bookletEstimateBytes = fbo_booklet_estimate_size_bytes($posts, $captions);
+$bookletEstimateBytes = ($adminAuthed && $editMode) ? fbo_booklet_estimate_size_bytes($posts, $captions) : 0;
 $allPostsCount = count($posts);
 $singlePostMode = false;
 if ($requestedPostId !== '' && !$composeMode) {
@@ -2351,7 +2364,7 @@ if (!$shuffleActive && $shuffleEligible) {
 	$shuffleToggleQuery .= '&shuffle=1&shuffle_seed=' . rawurlencode((string) $shuffleSeed);
 }
 
-$backupEstimateBytes = backup_estimate_size_bytes();
+$backupEstimateBytes = ($adminAuthed && $editMode) ? backup_estimate_size_bytes() : 0;
 
 $perPage = $view === 'grid' ? 180 : 60;
 $totalItems = count($posts);
@@ -2391,12 +2404,13 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 	<link rel="stylesheet" href="<?= local_asset_url('assets/css/styles.css') ?>">
 	<link rel="stylesheet" href="<?= local_asset_url('assets/css/upload.css') ?>">
 	<link rel="stylesheet" href="<?= local_asset_url('assets/css/audio-player.css') ?>">
+	<link rel="stylesheet" href="<?= local_asset_url('assets/css/visitor-interactions.css') ?>">
 	<?php if ($editMode || $composeMode): ?>
 		<link rel="stylesheet" href="<?= local_asset_url('assets/css/admin.css') ?>">
 	<?php endif; ?>
 </head>
 
-<body class="<?= $showIntroAnimation ? 'intro-loading' : '' ?>" data-max-text-post-length="<?= MAX_TEXT_POST_LENGTH ?>"
+<body data-intro-requested="<?= $showIntroAnimation ? '1' : '0' ?>" data-max-text-post-length="<?= MAX_TEXT_POST_LENGTH ?>"
 	data-compose-mode="<?= $composeMode ? '1' : '0' ?>" data-shuffle-celebration="<?= $shuffleCelebrationActive ? '1' : '0' ?>"
 	data-backup-estimate-bytes="<?= (int) $backupEstimateBytes ?>">
 	<div class="intro-overlay" id="introOverlay" aria-hidden="true">
@@ -2485,7 +2499,7 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 						<div class="media-wrap">
 							<?php if ((string) ($post['type'] ?? '') === 'video'): ?>
 								<?php if ($view === 'grid'): ?>
-									<video class="grid-video-thumb" src="<?= $mediaUrl ?>#t=0.1" preload="metadata" playsinline muted aria-hidden="true"></video>
+									<video class="grid-video-thumb" src="<?= $mediaUrl ?>#t=0.1" preload="none" playsinline muted aria-hidden="true"></video>
 									<div class="grid-video-overlay" aria-hidden="true">
 										<svg class="grid-play-icon" width="36px" height="36px" viewBox="0 0 24 24" fill="none"
 											xmlns="http://www.w3.org/2000/svg">
@@ -2508,7 +2522,7 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 							<?php elseif ((string) ($post['type'] ?? '') === 'audio'): ?>
 								<div class="grid-audio-placeholder" aria-hidden="true"></div>
 							<?php else: ?>
-								<img src="<?= $mediaUrl ?>" alt="Uploaded media" loading="lazy">
+								<img src="<?= $mediaUrl ?>" alt="Uploaded media" loading="lazy" decoding="async">
 							<?php endif; ?>
 						</div>
 						<?php if ($postCaption !== '' && $view !== 'grid'): ?>
@@ -2549,6 +2563,21 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 							</button>
 						</form>
 					<?php endif; ?>
+					<?php if (!$adminAuthed && $view === 'single'): ?>
+					<div class="visitor-panel">
+					<?php if ($singlePostMode && $visitorIdentity !== ''): ?>
+					<form method="post" id="note-form">
+					<input type="hidden" name="visitor_action" value="note">
+					<input type="hidden" name="interaction_token" value="<?= $interactionToken ?>">
+					<input type="hidden" name="note_post_id" value="<?= htmlspecialchars((string) $post['id'], ENT_QUOTES, 'UTF-8') ?>">
+					<label>Leave a private note on this post<textarea name="note" maxlength="2000" required></textarea></label>
+					<button class="ui-btn" type="submit">send note</button>
+					</form>
+					<?php elseif ($visitorIdentity !== ''): ?>
+					<a class="ui-btn" href="<?= htmlspecialchars(blog_share_url((string) $post['id']), ENT_QUOTES, 'UTF-8') ?>#note-form">leave a note</a>
+					<?php else: ?><a class="ui-btn" href="/create">log in to leave a note</a><?php endif; ?>
+					</div>
+					<?php endif; ?>
 				</article>
 			<?php endforeach; ?>
 		</main>
@@ -2574,6 +2603,7 @@ $postsOnPage = array_slice($posts, ($page - 1) * $perPage, $perPage);
 		<?php endif; ?>
 	</nav>
 
+	<?php include __DIR__ . '/snippets/cookie-banner.php'; ?>
 	<script src="<?= local_asset_url('assets/js/script.js') ?>" defer></script>
 	<script src="<?= local_asset_url('assets/js/blog.js') ?>" defer></script>
 	<script src="<?= local_asset_url('assets/js/instant-capture.js') ?>" defer></script>

@@ -53,6 +53,70 @@ function fbo_booklet_image_data_uri(string $path): string
 		return $empty();
 	}
 
+	// Camera images often store their physical orientation in EXIF rather than
+	// rotating the pixels. GD does not apply that metadata when decoding, so do
+	// it before measuring and resizing the image for the booklet.
+	$orientation = 1;
+	if (function_exists('exif_read_data')) {
+		$exif = @exif_read_data($path, 'IFD0', true);
+		$orientation = (int) ($exif['IFD0']['Orientation'] ?? $exif['Orientation'] ?? 1);
+	}
+	switch ($orientation) {
+		case 2:
+			if (function_exists('imageflip')) {
+				imageflip($image, IMG_FLIP_HORIZONTAL);
+			}
+			break;
+		case 3:
+			$rotated = @imagerotate($image, 180, 0);
+			if ($rotated !== false) {
+				imagedestroy($image);
+				$image = $rotated;
+			}
+			break;
+		case 4:
+			if (function_exists('imageflip')) {
+				imageflip($image, IMG_FLIP_VERTICAL);
+			}
+			break;
+		case 5:
+			if (function_exists('imageflip')) {
+				imageflip($image, IMG_FLIP_HORIZONTAL);
+			}
+			$rotated = @imagerotate($image, 90, 0);
+			if ($rotated !== false) {
+				imagedestroy($image);
+				$image = $rotated;
+			}
+			break;
+		case 6:
+			$rotated = @imagerotate($image, 270, 0);
+			if ($rotated !== false) {
+				imagedestroy($image);
+				$image = $rotated;
+			}
+			break;
+		case 7:
+			if (function_exists('imageflip')) {
+				imageflip($image, IMG_FLIP_HORIZONTAL);
+			}
+			$rotated = @imagerotate($image, 270, 0);
+			if ($rotated !== false) {
+				imagedestroy($image);
+				$image = $rotated;
+			}
+			break;
+		case 8:
+			$rotated = @imagerotate($image, 90, 0);
+			if ($rotated !== false) {
+				imagedestroy($image);
+				$image = $rotated;
+			}
+			break;
+	}
+	$sourceWidth = imagesx($image);
+	$sourceHeight = imagesy($image);
+
 	$maxDimension = 1800;
 	$scale = min(1.0, $maxDimension / max($sourceWidth, $sourceHeight));
 	$width = max(1, (int) round($sourceWidth * $scale));
@@ -107,11 +171,19 @@ function fbo_booklet_estimate_size_bytes(array $posts, array $captions = []): in
 		if (!is_array($post)) {
 			continue;
 		}
-		$imageUri = fbo_booklet_media_uri($post);
-		if ($imageUri !== '') {
-			$bytes += (int) ceil(strlen($imageUri) * 1.03);
-			if (!empty($post['allow_shuffleboard']) && $shuffleImages < 12) {
-				$shuffleImages++;
+		// Estimate from file metadata; never decode or base64-encode images just
+		// to display the edit panel. The actual resized export can be smaller.
+		if (($post['type'] ?? '') === 'image' && function_exists('media_dir_path')) {
+			$root = realpath(media_dir_path());
+			$path = realpath(blog_root() . '/' . ltrim((string) ($post['path'] ?? ''), '/'));
+			if ($root !== false && $path !== false && is_file($path) && str_starts_with($path, $root . DIRECTORY_SEPARATOR)) {
+				$size = @filesize($path);
+				if (is_int($size) && $size > 0 && $size <= 16 * 1024 * 1024) {
+					$bytes += (int) ceil($size * 4 / 3) + 1000;
+					if (!empty($post['allow_shuffleboard']) && $shuffleImages < 12) {
+						$shuffleImages++;
+					}
+				}
 			}
 		}
 		if (in_array((string) ($post['type'] ?? ''), ['audio', 'video'], true)) {
@@ -253,7 +325,7 @@ html, body { margin: 0; padding: 0; background: #777; color: #141414; font-famil
 .back-cover { font-family: Inter, Arial, sans-serif; font-weight: 600;}
 .cover-mark { display: flex; align-items: center; justify-content: center; height: 46mm; font-size: 42mm; line-height: 1; }
 .cover-mark span { display: block; }
-.cover-mark svg { width: 31.5mm; height: 31.5mm; margin-left: 3mm; transform: translateY(-10px); }
+.cover-mark svg { width: 31.5mm; height: 31.5mm; margin-left: 3mm; transform: translateY(-15px); }
 h1 { font-size: 25pt; margin: 8mm 0 0; text-transform: uppercase; }
 .post-frame { height: 178mm; border: .5mm solid #141414; padding: 8mm; display: flex; flex-direction: column; }
 .post-text { flex: 1; font-family: Inter, Arial, sans-serif; font-size: 17pt; line-height: 1.4; white-space: normal; }
